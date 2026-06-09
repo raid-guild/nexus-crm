@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Key, Users, Settings, SlidersHorizontal, ClipboardList, Coins, FileText } from "lucide-react";
 
 const navItems = [
-  { label: "LLM Keys",     href: "/admin/llm-keys",     icon: Key },
+  { label: "AI Integrations", href: "/admin/llm-keys", icon: Key },
   { label: "Users",        href: "/admin/users",        icon: Users },
   { label: "Services",     href: "/admin/services",     icon: Settings },
   { label: "CRM Settings", href: "/admin/crm-settings", icon: SlidersHorizontal },

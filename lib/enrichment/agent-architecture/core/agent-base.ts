@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import OpenAI from 'openai';
+import { createOpenAICompatibleClient } from '@/lib/openai-compatible';
 
 export interface AgentContext<T = unknown> {
   input: T;
@@ -29,7 +30,7 @@ export abstract class BaseAgent<TInput = unknown, TOutput = unknown> {
     public inputSchema?: z.ZodSchema<TInput>,
     public outputSchema?: z.ZodSchema<TOutput>
   ) {
-    this.openai = new OpenAI({ apiKey });
+    this.openai = createOpenAICompatibleClient(apiKey);
   }
   
   abstract instructions(context: AgentContext<TInput>): string;

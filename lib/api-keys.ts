@@ -4,11 +4,11 @@ import type { ApiKeyProvider } from "@prisma/client";
 
 export type { ApiKeyProvider };
 
-const PROVIDER_ENV_MAP: Record<ApiKeyProvider, string> = {
-  OPENAI: "OPENAI_API_KEY",
-  FIRECRAWL: "FIRECRAWL_API_KEY",
-  ANTHROPIC: "ANTHROPIC_API_KEY",
-  GROQ: "GROQ_API_KEY",
+const PROVIDER_ENV_MAP: Record<ApiKeyProvider, string[]> = {
+  OPENAI: ["OPENAI_API_KEY", "OPEN_AI_API_KEY", "VENICE_API_KEY"],
+  FIRECRAWL: ["FIRECRAWL_API_KEY"],
+  ANTHROPIC: ["ANTHROPIC_API_KEY"],
+  GROQ: ["GROQ_API_KEY"],
 };
 
 /**
@@ -23,8 +23,10 @@ export async function getApiKey(
   userId?: string
 ): Promise<string | null> {
   // Tier 1: ENV
-  const envKey = process.env[PROVIDER_ENV_MAP[provider]];
-  if (envKey) return envKey;
+  for (const envName of PROVIDER_ENV_MAP[provider]) {
+    const envKey = process.env[envName]?.trim();
+    if (envKey) return envKey;
+  }
 
   // Tier 2: system-wide DB key
   const systemRow = await prismadb.apiKeys.findFirst({

@@ -7,9 +7,10 @@ import {
 } from "@/inngest/lib/embedding-utils";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { minioClient, MINIO_BUCKET } from "@/lib/minio";
-import OpenAI from "openai";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+import {
+  createOpenAICompatibleClient,
+  getOpenAIChatModel,
+} from "@/lib/openai-compatible";
 
 const CHUNK_SIZE = 512; // tokens (approx 4 chars per token)
 const CHUNK_OVERLAP = 50;
@@ -171,8 +172,9 @@ export const enrichDocument = inngest.createFunction(
     // Step 3: Generate summary
     const summary = await step.run("generate-summary", async () => {
       const truncated = contentText.slice(0, 12000); // ~3000 tokens for summary input
+      const openai = createOpenAICompatibleClient();
       const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: getOpenAIChatModel(),
         messages: [
           {
             role: "system",
@@ -194,8 +196,9 @@ export const enrichDocument = inngest.createFunction(
     // Step 4: AI classification
     await step.run("ai-classify", async () => {
       const truncated = contentText.slice(0, 4000);
+      const openai = createOpenAICompatibleClient();
       const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: getOpenAIChatModel(),
         messages: [
           {
             role: "system",

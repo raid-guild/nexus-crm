@@ -1,7 +1,9 @@
 import { createHash } from "crypto";
-import OpenAI from "openai";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+import {
+  assertEmbeddingDimensions,
+  createOpenAICompatibleClient,
+  getEmbeddingConfig,
+} from "@/lib/openai-compatible";
 
 /**
  * Concatenate non-null text fields into a single embedding string.
@@ -21,15 +23,19 @@ export function computeContentHash(text: string): string {
 }
 
 /**
- * Generate an embedding vector via OpenAI text-embedding-3-small.
- * Returns a float array of 1536 dimensions.
+ * Generate an embedding vector via the configured OpenAI-compatible provider.
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
+  const openai = createOpenAICompatibleClient();
+  const { model, dimensions } = getEmbeddingConfig();
   const response = await openai.embeddings.create({
-    model: "text-embedding-3-small",
+    model,
     input: text,
+    dimensions,
   });
-  return response.data[0].embedding;
+  const embedding = response.data[0].embedding;
+  assertEmbeddingDimensions(embedding);
+  return embedding;
 }
 
 /**

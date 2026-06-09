@@ -3,6 +3,32 @@ set -e
 
 echo "==> NextCRM Docker Entrypoint"
 
+# Railway and many other hosts provide DATABASE_URL but not individual
+# connection parts. Derive the fields used by pg_isready/psql when needed.
+if [ -n "$DATABASE_URL" ]; then
+  if [ -z "$DB_HOST" ]; then
+    export DB_HOST=$(node -e 'const u = new URL(process.env.DATABASE_URL); console.log(u.hostname)')
+  fi
+  if [ -z "$DB_PORT" ]; then
+    export DB_PORT=$(node -e 'const u = new URL(process.env.DATABASE_URL); console.log(u.port || "5432")')
+  fi
+  if [ -z "$DB_USER" ]; then
+    export DB_USER=$(node -e 'const u = new URL(process.env.DATABASE_URL); console.log(decodeURIComponent(u.username))')
+  fi
+  if [ -z "$DB_PASSWORD" ]; then
+    export DB_PASSWORD=$(node -e 'const u = new URL(process.env.DATABASE_URL); console.log(decodeURIComponent(u.password))')
+  fi
+  if [ -z "$DB_NAME" ]; then
+    export DB_NAME=$(node -e 'const u = new URL(process.env.DATABASE_URL); console.log(u.pathname.replace(/^\/+/, ""))')
+  fi
+  if [ -z "$PGSSLMODE" ]; then
+    SSLMODE=$(node -e 'const u = new URL(process.env.DATABASE_URL); console.log(u.searchParams.get("sslmode") || "")')
+    if [ -n "$SSLMODE" ]; then
+      export PGSSLMODE="$SSLMODE"
+    fi
+  fi
+fi
+
 # --- 1. Wait for Postgres ---
 echo "==> Waiting for PostgreSQL..."
 RETRIES=30
@@ -34,7 +60,7 @@ prisma migrate deploy
 echo "==> Migrations complete."
 
 # --- 4. Create MinIO bucket (idempotent) ---
-if [ -n "$MINIO_ENDPOINT" ] && [ -n "$MINIO_ACCESS_KEY" ] && [ -n "$MINIO_SECRET_KEY" ] && [ -n "$MINIO_BUCKET" ]; then
+if [ "$SKIP_MINIO_BUCKET_CREATE" != "1" ] && [ -n "$MINIO_ENDPOINT" ] && [ -n "$MINIO_ACCESS_KEY" ] && [ -n "$MINIO_SECRET_KEY" ] && [ -n "$MINIO_BUCKET" ]; then
   echo "==> Ensuring MinIO bucket '$MINIO_BUCKET' exists..."
   # Strip protocol for host:port extraction
   MINIO_HOST=$(echo "$MINIO_ENDPOINT" | sed 's|https\?://||')

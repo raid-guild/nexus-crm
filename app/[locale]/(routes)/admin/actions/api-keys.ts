@@ -19,11 +19,11 @@ async function ensureAdmin(): Promise<void> {
   }
 }
 
-const PROVIDER_ENV_MAP: Record<ApiKeyProvider, string> = {
-  OPENAI: "OPENAI_API_KEY",
-  FIRECRAWL: "FIRECRAWL_API_KEY",
-  ANTHROPIC: "ANTHROPIC_API_KEY",
-  GROQ: "GROQ_API_KEY",
+const PROVIDER_ENV_MAP: Record<ApiKeyProvider, string[]> = {
+  OPENAI: ["OPENAI_API_KEY", "OPEN_AI_API_KEY", "VENICE_API_KEY"],
+  FIRECRAWL: ["FIRECRAWL_API_KEY"],
+  ANTHROPIC: ["ANTHROPIC_API_KEY"],
+  GROQ: ["GROQ_API_KEY"],
 };
 
 export type ProviderStatus = {
@@ -39,7 +39,9 @@ export async function getSystemApiKeys(): Promise<ProviderStatus[]> {
 
   return Promise.all(
     providers.map(async (provider): Promise<ProviderStatus> => {
-      const envValue = process.env[PROVIDER_ENV_MAP[provider]];
+      const envValue = PROVIDER_ENV_MAP[provider]
+        .map((envName) => process.env[envName]?.trim())
+        .find(Boolean);
       if (envValue) {
         return {
           provider,
