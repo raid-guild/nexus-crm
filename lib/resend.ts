@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-import nodemailer from "nodemailer";
+import sgMail from "@sendgrid/mail";
 import { render } from "@react-email/render";
 import type { ReactElement } from "react";
 import { prismadb } from "./prisma";
@@ -24,13 +24,12 @@ type SendEmailOptions = {
 function shouldUseSendGrid() {
   return (
     process.env.EMAIL_PROVIDER === "sendgrid" ||
-    Boolean(process.env.SENDGRID_API_KEY) ||
-    process.env.EMAIL_HOST === "smtp.sendgrid.net"
+    Boolean(process.env.SENDGRID_API_KEY)
   );
 }
 
 function createSendGridMailer() {
-  const apiKey = process.env.SENDGRID_API_KEY || process.env.EMAIL_PASSWORD;
+  const apiKey = process.env.SENDGRID_API_KEY;
 
   if (!apiKey) {
     throw new Error(
@@ -38,24 +37,28 @@ function createSendGridMailer() {
     );
   }
 
-  const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || "smtp.sendgrid.net",
-    port: Number(process.env.EMAIL_PORT || 587),
-    secure: process.env.EMAIL_SECURE === "true",
-    auth: {
-      user: process.env.EMAIL_USERNAME || "apikey",
-      pass: apiKey,
-    },
-  });
+  sgMail.setApiKey(apiKey);
 
   return {
     emails: {
       send: async ({ react, html, ...email }: SendEmailOptions) => {
         const renderedHtml = html ?? (react ? await render(react) : undefined);
+        const attachments = email.attachments
+          ?.filter((attachment) => attachment.content !== undefined)
+          .map((attachment) => ({
+            filename: attachment.filename || "attachment",
+            type: attachment.contentType,
+            disposition: "attachment" as const,
+            content: Buffer.isBuffer(attachment.content)
+              ? attachment.content.toString("base64")
+              : Buffer.from(String(attachment.content)).toString("base64"),
+          }));
 
-        await transporter.sendMail({
+        await sgMail.send({
           ...email,
+          text: email.text ?? "",
           html: renderedHtml,
+          attachments,
         });
       },
     },
