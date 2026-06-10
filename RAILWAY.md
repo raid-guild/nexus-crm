@@ -34,10 +34,20 @@ BETTER_AUTH_URL=https://your-nextcrm.up.railway.app
 NEXT_PUBLIC_APP_URL=https://your-nextcrm.up.railway.app
 ADMIN_EMAIL=you@example.com
 NEXT_PUBLIC_APP_NAME=The RaidGuild Nexus
+EMAIL_PROVIDER=sendgrid
+SENDGRID_API_KEY=<sendgrid api key>
+EMAIL_HOST=smtp.sendgrid.net
+EMAIL_PORT=587
+EMAIL_USERNAME=apikey
+EMAIL_SECURE=false
+EMAIL_FROM=noreply@yourdomain.com
+AUTH_GOOGLE_ENABLED=false
+NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=false
 ```
 
-For production login, also set Resend or another supported email provider so
-email OTP codes can be delivered.
+For production login, `EMAIL_FROM` must be a SendGrid-verified sender or a
+sender on a SendGrid-authenticated domain. Resend is still supported by setting
+`RESEND_API_KEY` instead of `EMAIL_PROVIDER=sendgrid`.
 
 For AI integrations, this fork is designed to keep secrets in Railway variables:
 

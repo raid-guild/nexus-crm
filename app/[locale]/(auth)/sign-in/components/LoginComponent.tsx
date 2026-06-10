@@ -29,6 +29,8 @@ export function LoginComponent() {
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
+  const googleAuthEnabled =
+    process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true";
 
   const loginWithGoogle = async () => {
     setIsLoading(true);
@@ -99,26 +101,30 @@ export function LoginComponent() {
         <CardDescription>Choose your sign-in method</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
-        <Button
-          variant="outline"
-          onClick={loginWithGoogle}
-          disabled={isLoading}
-          className="w-full"
-        >
-          <Icons.google className="mr-2 h-4 w-4" />
-          Continue with Google
-        </Button>
+        {googleAuthEnabled && (
+          <>
+            <Button
+              variant="outline"
+              onClick={loginWithGoogle}
+              disabled={isLoading}
+              className="w-full"
+            >
+              <Icons.google className="mr-2 h-4 w-4" />
+              Continue with Google
+            </Button>
 
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">
-              Or continue with email
-            </span>
-          </div>
-        </div>
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or continue with email
+                </span>
+              </div>
+            </div>
+          </>
+        )}
 
         {step === "email" && (
           <div className="grid gap-3">
