@@ -5,6 +5,43 @@ import { NextRequest, NextResponse } from "next/server";
 
 const intlMiddleware = createMiddleware(routing);
 
+function getPublicAppURL(): URL | null {
+  const value = process.env.NEXT_PUBLIC_APP_URL ?? process.env.BETTER_AUTH_URL;
+  if (!value) return null;
+
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+}
+
+function normalizePublicRedirect(response: NextResponse): NextResponse {
+  const publicURL = getPublicAppURL();
+  const location = response.headers.get("location");
+
+  if (!publicURL || !location) return response;
+
+  try {
+    const redirectURL = new URL(location, publicURL);
+    if (redirectURL.hostname.endsWith(".up.railway.app") && redirectURL.port === "8080") {
+      redirectURL.port = "";
+      response.headers.set("location", redirectURL.toString());
+      return response;
+    }
+
+    if (redirectURL.hostname === publicURL.hostname) {
+      redirectURL.protocol = publicURL.protocol;
+      redirectURL.host = publicURL.host;
+      response.headers.set("location", redirectURL.toString());
+    }
+  } catch {
+    return response;
+  }
+
+  return response;
+}
+
 // Admin-only API paths — cookie presence checked here, role checked server-side
 const ADMIN_ONLY_PATHS = [
   "/api/user/activateAdmin",
@@ -45,13 +82,14 @@ export async function proxy(req: NextRequest) {
       const authPaths = ["/sign-in", "/register", "/pending", "/inactive"];
       const isAuthPage = authPaths.some((p) => path.includes(p));
       if (!isAuthPage) {
-        return NextResponse.redirect(new URL("/sign-in", req.nextUrl));
+        const publicURL = getPublicAppURL();
+        return NextResponse.redirect(new URL("/sign-in", publicURL ?? req.nextUrl));
       }
     }
   }
 
   // Non-API routes — delegate to next-intl
-  return intlMiddleware(req);
+  return normalizePublicRedirect(intlMiddleware(req));
 }
 
 export const config = {

@@ -103,13 +103,13 @@ services:
       # Inngest
       INNGEST_DEV: "1"
       INNGEST_ID: nextcrm
-      INNGEST_APP_NAME: NextCRM
+      INNGEST_APP_NAME: The RaidGuild Nexus
       INNGEST_EVENT_KEY: local
       INNGEST_SIGNING_KEY: ""
       INNGEST_BASE_URL: http://inngest:8288
 
       # App
-      NEXT_PUBLIC_APP_NAME: NextCRM
+      NEXT_PUBLIC_APP_NAME: The RaidGuild Nexus
       NEXT_PUBLIC_APP_URL: http://localhost:3000
 
       # Initial admin account (created on first run by the seed script).

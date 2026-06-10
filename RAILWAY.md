@@ -33,7 +33,7 @@ EMAIL_ENCRYPTION_KEY=<openssl rand -hex 32>
 BETTER_AUTH_URL=https://your-nextcrm.up.railway.app
 NEXT_PUBLIC_APP_URL=https://your-nextcrm.up.railway.app
 ADMIN_EMAIL=you@example.com
-NEXT_PUBLIC_APP_NAME=NextCRM
+NEXT_PUBLIC_APP_NAME=The RaidGuild Nexus
 ```
 
 For production login, also set Resend or another supported email provider so

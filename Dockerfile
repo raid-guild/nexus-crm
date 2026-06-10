@@ -116,10 +116,6 @@ RUN mkdir -p /app/node_modules/@prisma && \
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x docker-entrypoint.sh
 
-# Set ownership for /app (standalone output + prisma)
-# and /opt/tools so the non-root nextjs user can use them.
-RUN chown -R nextjs:nodejs /app /opt/tools
-
 USER nextjs
 
 EXPOSE 3000
