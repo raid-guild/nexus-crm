@@ -16,6 +16,7 @@
     "validate:migration": "pnpm exec tsx scripts/validate-migration.ts",
     "memory:crm:preview": "node scripts/memory-archive/prepare-crm-import.mjs",
     "memory:crm:relationship-preview": "node scripts/memory-archive/prepare-crm-import.mjs --profile=relationship-history --out=exports/memory-crm-relationship-history-preview",
+    "memory:crm:full-preview": "node scripts/memory-archive/prepare-crm-import.mjs --profile=full-legacy-crm --out=exports/memory-crm-full-legacy-preview",
     "test": "jest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",

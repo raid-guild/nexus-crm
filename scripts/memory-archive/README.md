@@ -20,6 +20,13 @@ Relationship history scope:
 - groups known same-client project families into one account with multiple opportunities
 - keeps possible duplicates out of the import draft for review
 
+Full legacy CRM scope:
+
+- includes every legacy CRM candidate from the archive
+- keeps `LOST`, low-score, duplicate, and knowledge-only records in the draft
+- marks risky/low-confidence rows as `needs_review`
+- should be reviewed before any live database import
+
 Run:
 
 ```bash
@@ -30,6 +37,12 @@ Run the approved relationship-history preview:
 
 ```bash
 pnpm memory:crm:relationship-preview
+```
+
+Run the full legacy CRM preview:
+
+```bash
+pnpm memory:crm:full-preview
 ```
 
 Useful options:

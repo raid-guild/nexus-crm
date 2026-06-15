@@ -19,17 +19,22 @@ const archiveDir = path.resolve(args.get("archive") || DEFAULT_ARCHIVE);
 const outputDir = path.resolve(args.get("out") || DEFAULT_OUTPUT);
 const profile = args.get("profile") || "operational";
 const relationshipHistory = profile === "relationship-history";
+const fullLegacyCrm = profile === "full-legacy-crm";
 const minScore = Number(
   args.get("min-score") || (relationshipHistory ? RELATIONSHIP_HISTORY_MIN_SCORE : DEFAULT_MIN_SCORE),
 );
 const includeShipped = args.has("include-shipped")
   ? args.get("include-shipped") === "true"
-  : relationshipHistory;
-const includeLost = args.get("include-lost") === "true";
-const includeDuplicates = args.get("include-duplicates") === "true";
+  : relationshipHistory || fullLegacyCrm;
+const includeLost = args.has("include-lost")
+  ? args.get("include-lost") === "true"
+  : fullLegacyCrm;
+const includeDuplicates = args.has("include-duplicates")
+  ? args.get("include-duplicates") === "true"
+  : fullLegacyCrm;
 const groupClients = args.has("group-clients")
   ? args.get("group-clients") === "true"
-  : relationshipHistory;
+  : relationshipHistory || fullLegacyCrm;
 
 const readJson = (filePath) => JSON.parse(fs.readFileSync(filePath, "utf8"));
 
@@ -195,11 +200,27 @@ const accountType = (status) =>
   status === "RAIDING" || status === "PREPARING" ? "Prospect" : "Customer";
 
 const shouldConsider = (candidate) => {
+  if (fullLegacyCrm) return true;
   if ((candidate.score || 0) < minScore) return false;
   if (OPERATIONAL_STATUSES.has(candidate.crm_status)) return true;
   if (includeShipped && candidate.crm_status === "SHIPPED") return true;
   if (includeLost && candidate.crm_status === "LOST") return true;
   return false;
+};
+
+const reviewReasonsFor = (candidate, metadata, duplicateReason) => {
+  const reasons = [];
+  if ((candidate.score || 0) < 10) reasons.push("low score");
+  if (candidate.confidence === "low" || metadata.confidence === "low") reasons.push("low confidence");
+  if (candidate.crm_status === "LOST") reasons.push("lost legacy CRM record");
+  if (duplicateReason) reasons.push("possible duplicate or archive relationship");
+  if (candidate.recommended_action === "review_for_member_project") reasons.push("archive recommended human review");
+  if (candidate.recommended_action === "knowledge_only") reasons.push("archive recommended knowledge-only");
+  if (candidate.recommended_action === "update_existing_project_source_evidence") {
+    reasons.push("archive recommended source-evidence update");
+  }
+  if ((metadata.sensitivity_flags || []).length) reasons.push("sensitive CRM context");
+  return [...new Set(reasons)];
 };
 
 const now = new Date().toISOString();
@@ -229,6 +250,8 @@ const mergeAccountDraft = (account) => {
       internal_people: account.internal_people,
       services_required: account.services_required,
       crm_statuses: [account.crm_status],
+      review_statuses: [account.review_status],
+      review_reasons: account.review_reasons,
     });
     return;
   }
@@ -239,6 +262,9 @@ const mergeAccountDraft = (account) => {
   existing.internal_people = [...new Set([...existing.internal_people, ...account.internal_people])];
   existing.services_required = [...new Set([...existing.services_required, ...account.services_required])];
   existing.crm_statuses = [...new Set([...existing.crm_statuses, account.crm_status])];
+  existing.review_statuses = [...new Set([...existing.review_statuses, account.review_status])];
+  existing.review_reasons = [...new Set([...existing.review_reasons, ...account.review_reasons])];
+  existing.review_status = existing.review_statuses.includes("needs_review") ? "needs_review" : "ready";
   existing.score = Math.max(existing.score, account.score);
   existing.status = existing.crm_statuses.some((status) => OPERATIONAL_STATUSES.has(status))
     ? "Active"
@@ -253,6 +279,7 @@ const mergeAccountDraft = (account) => {
     `CRM raid IDs: ${existing.crm_raid_ids.join(", ")}`,
     existing.internal_people.length ? `Internal raid party: ${existing.internal_people.join(", ")}` : "",
     existing.services_required.length ? `Services: ${existing.services_required.map(titleCase).join(", ")}` : "",
+    existing.review_reasons.length ? `Review reasons: ${existing.review_reasons.join(", ")}` : "",
   ].filter(Boolean).join("\n");
 };
 
@@ -268,6 +295,8 @@ for (const candidate of candidatesFile.candidates || []) {
   const duplicateReason = candidate.recommended_action === "review_possible_duplicate"
     || candidate.dedupe_confidence !== "none"
     || metadata.dedupe_confidence !== "none";
+  const reviewReasons = reviewReasonsFor(candidate, metadata, duplicateReason);
+  const reviewStatus = reviewReasons.length ? "needs_review" : "ready";
 
   const base = {
     source: "memory-archive",
@@ -288,6 +317,8 @@ for (const candidate of candidatesFile.candidates || []) {
     roles_required: metadata.crm_roles_required || [],
     budget_band: titleCase(metadata.crm_budget_band),
     delivery_priority: titleCase(metadata.crm_delivery_priority),
+    review_status: reviewStatus,
+    review_reasons: reviewReasons,
     generated_at: now,
   };
 
@@ -311,7 +342,7 @@ for (const candidate of candidatesFile.candidates || []) {
     continue;
   }
 
-  if (seenAccountNames.has(normalizedName)) {
+  if (seenAccountNames.has(normalizedName) && !includeDuplicates) {
     reviewRows.push({
       ...base,
       name: candidate.name,
@@ -319,7 +350,9 @@ for (const candidate of candidatesFile.candidates || []) {
     });
     continue;
   }
-  seenAccountNames.set(normalizedName, candidate.crm_raid_id);
+  if (!seenAccountNames.has(normalizedName)) {
+    seenAccountNames.set(normalizedName, candidate.crm_raid_id);
+  }
 
   const provenance = [
     `Source: ${base.source}`,
@@ -329,6 +362,7 @@ for (const candidate of candidatesFile.candidates || []) {
     people.length ? `Internal raid party: ${people.join(", ")}` : "",
     base.services_required.length ? `Services: ${base.services_required.map(titleCase).join(", ")}` : "",
     base.budget_band ? `Budget band: ${base.budget_band}` : "",
+    reviewReasons.length ? `Review reasons: ${reviewReasons.join(", ")}` : "",
   ].filter(Boolean);
 
   accountRows.push({
@@ -371,6 +405,8 @@ const groupedAccountRows = [...accountDrafts.values()].map((row) => ({
   crm_raid_ids: row.crm_raid_ids,
   knowledge_docs: row.knowledge_docs,
 }));
+const reviewableAccounts = groupedAccountRows.filter((row) => row.review_status === "needs_review").length;
+const reviewableOpportunities = opportunityRows.filter((row) => row.review_status === "needs_review").length;
 
 fs.mkdirSync(outputDir, { recursive: true });
 
@@ -392,6 +428,8 @@ const preview = {
   counts: {
     account_candidates: groupedAccountRows.length,
     opportunity_candidates: opportunityRows.length,
+    account_needs_review: reviewableAccounts,
+    opportunity_needs_review: reviewableOpportunities,
     review_only: reviewRows.length,
     skipped: skippedRows.length,
   },
@@ -415,6 +453,8 @@ writeCsv(path.join(outputDir, "accounts.csv"), groupedAccountRows, [
   "account_slug",
   "project_count",
   "project_names",
+  "review_status",
+  "review_reasons",
   "status",
   "type",
   "website",
@@ -431,6 +471,8 @@ writeCsv(path.join(outputDir, "opportunities.csv"), opportunityRows, [
   "name",
   "account_name",
   "account_slug",
+  "review_status",
+  "review_reasons",
   "status",
   "budget",
   "expected_revenue",
@@ -467,6 +509,8 @@ const report = [
   "",
   `- Account candidates: ${groupedAccountRows.length}`,
   `- Opportunity candidates: ${opportunityRows.length}`,
+  `- Accounts needing review: ${reviewableAccounts}`,
+  `- Opportunities needing review: ${reviewableOpportunities}`,
   `- Review only: ${reviewRows.length}`,
   `- Skipped: ${skippedRows.length}`,
   "",
@@ -476,10 +520,13 @@ const report = [
   includeShipped
     ? `- Includes RAIDING, PREPARING, and SHIPPED records with score >= ${minScore}.`
     : `- Includes RAIDING and PREPARING records with score >= ${minScore}.`,
-  includeLost ? "- Includes LOST records." : "- Excludes lost records.",
-  "- Excludes possible duplicates unless explicitly requested.",
+  fullLegacyCrm
+    ? "- Full legacy CRM mode includes all statuses and all scores."
+    : includeLost ? "- Includes LOST records." : "- Excludes lost records.",
+  includeDuplicates ? "- Includes possible duplicates and marks them for review." : "- Excludes possible duplicates unless explicitly requested.",
   "- Does not import internal raid-party people as CRM contacts.",
   groupClients ? "- Groups known same-client project families into one account with multiple opportunities." : "",
+  "- Marks low-confidence, low-score, lost, duplicate, knowledge-only, and sensitive-context records as needs_review.",
   "",
   "## Account Candidates",
   "",
@@ -487,6 +534,8 @@ const report = [
     `### ${row.name}`,
     "",
     `- Project count: ${row.project_count}`,
+    `- Review status: ${row.review_status}`,
+    row.review_reasons.length ? `- Review reasons: ${row.review_reasons.join(", ")}` : "- Review reasons: n/a",
     `- Projects: ${row.project_names.join(", ")}`,
     `- CRM statuses: ${row.crm_statuses.join(", ")}`,
     `- Score: ${row.score}`,
