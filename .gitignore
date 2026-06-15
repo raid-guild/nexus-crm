@@ -52,8 +52,9 @@ migration-errors.log
 # backups
 backups/
 
-# generated CRM import review artifacts; may contain member-only archive context
-/exports/memory-crm-*-preview/
+# local legacy CRM/archive import experiments; may contain member-only context
+/scripts/memory-archive/
+/exports/memory-crm*/
 
 #Agents
 .claude/
