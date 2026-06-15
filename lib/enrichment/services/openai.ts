@@ -2,12 +2,13 @@ import OpenAI from 'openai';
 import { z } from 'zod';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import type { EnrichmentField, EnrichmentResult } from '../types';
+import { createOpenAICompatibleClient } from '@/lib/openai-compatible';
 
 export class OpenAIService {
   private client: OpenAI;
 
   constructor(apiKey: string) {
-    this.client = new OpenAI({ apiKey });
+    this.client = createOpenAICompatibleClient(apiKey);
   }
 
   createEnrichmentSchema(fields: EnrichmentField[]) {

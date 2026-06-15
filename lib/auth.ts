@@ -5,9 +5,14 @@ import { admin as adminPlugin } from "better-auth/plugins";
 import { prismadb } from "@/lib/prisma";
 import { ac, admin, manager, user } from "@/lib/auth-permissions";
 import { newUserNotify } from "@/lib/new-user-notify";
+import { portalLaunchAuth } from "@/lib/portal-launch-auth";
 import resendHelper from "@/lib/resend";
 
 const isDemo = process.env.NEXT_PUBLIC_APP_URL === "https://demo.nextcrm.io";
+const googleAuthEnabled =
+  process.env.AUTH_GOOGLE_ENABLED === "true" &&
+  Boolean(process.env.GOOGLE_ID) &&
+  Boolean(process.env.GOOGLE_SECRET);
 
 export const auth = betterAuth({
   database: prismaAdapter(prismadb, { provider: "postgresql" }),
@@ -55,12 +60,14 @@ export const auth = betterAuth({
     },
   },
 
-  socialProviders: {
-    google: {
-      clientId: process.env.GOOGLE_ID!,
-      clientSecret: process.env.GOOGLE_SECRET!,
-    },
-  },
+  socialProviders: googleAuthEnabled
+    ? {
+        google: {
+          clientId: process.env.GOOGLE_ID!,
+          clientSecret: process.env.GOOGLE_SECRET!,
+        },
+      }
+    : {},
 
   emailAndPassword: {
     enabled: false,
@@ -96,12 +103,13 @@ export const auth = betterAuth({
       roles: { admin, manager, user },
       defaultRole: "user",
     }),
+    portalLaunchAuth(),
   ],
 
   account: {
     accountLinking: {
       enabled: true,
-      trustedProviders: ["google"],
+      trustedProviders: googleAuthEnabled ? ["google"] : [],
     },
   },
 

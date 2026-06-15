@@ -24,7 +24,17 @@ services:
   minio:
     image: minio/minio:latest
     restart: unless-stopped
-    command: server /data --console-address ":9001"
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      '
+        /usr/bin/minio server /data --console-address ":9001" &
+        pid=$$!
+        until mc alias set local http://localhost:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"; do
+          sleep 1
+        done
+        mc mb -p local/nextcrm || true
+        wait $$pid
+      '
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-nextcrm}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-changeme}
@@ -50,7 +60,7 @@ services:
     networks:
       - nextcrm
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8288/health"]
+      test: ["CMD", "inngest", "version"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -88,17 +98,18 @@ services:
       MINIO_USE_SSL: "false"
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-nextcrm}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-changeme}
+      SKIP_MINIO_BUCKET_CREATE: "1"
 
       # Inngest
       INNGEST_DEV: "1"
       INNGEST_ID: nextcrm
-      INNGEST_APP_NAME: NextCRM
+      INNGEST_APP_NAME: The RaidGuild Nexus
       INNGEST_EVENT_KEY: local
       INNGEST_SIGNING_KEY: ""
       INNGEST_BASE_URL: http://inngest:8288
 
       # App
-      NEXT_PUBLIC_APP_NAME: NextCRM
+      NEXT_PUBLIC_APP_NAME: The RaidGuild Nexus
       NEXT_PUBLIC_APP_URL: http://localhost:3000
 
       # Initial admin account (created on first run by the seed script).
@@ -116,9 +127,24 @@ services:
       # the corresponding features. The app runs fine with placeholders;
       # individual features just won't work until real keys are provided.
       OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-placeholder-replace-to-enable-ai}
+      VENICE_API_KEY: ${VENICE_API_KEY:-}
+      AI_EMBEDDINGS_PROVIDER: ${AI_EMBEDDINGS_PROVIDER:-openai}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_COMPATIBLE_BASE_URL: ${OPENAI_COMPATIBLE_BASE_URL:-}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      OPENAI_EMBEDDING_DIMENSIONS: ${OPENAI_EMBEDDING_DIMENSIONS:-1536}
+      OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-}
+      AI_AGENT_PROVIDER: ${AI_AGENT_PROVIDER:-prism}
+      PRISM_CODEX_RUNTIME_URL: ${PRISM_CODEX_RUNTIME_URL:-}
+      PRISM_CODEX_RUNTIME_TOKEN: ${PRISM_CODEX_RUNTIME_TOKEN:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-re_placeholder_replace_to_enable_email}
       GOOGLE_ID: ${GOOGLE_ID:-}
       GOOGLE_SECRET: ${GOOGLE_SECRET:-}
+      PORTAL_MODULE_LAUNCH_SECRET: ${PORTAL_MODULE_LAUNCH_SECRET:-}
+      PORTAL_LAUNCH_ISSUER: ${PORTAL_LAUNCH_ISSUER:-https://portal.raidguild.org}
+      PORTAL_LAUNCH_AUDIENCE: ${PORTAL_LAUNCH_AUDIENCE:-nexus}
+      PORTAL_LAUNCH_MODULE_SLUG: ${PORTAL_LAUNCH_MODULE_SLUG:-nexus}
+      PORTAL_LAUNCH_REDIRECT_PATH: ${PORTAL_LAUNCH_REDIRECT_PATH:-/}
       FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-}
       E2B_API_KEY: ${E2B_API_KEY:-}
     depends_on:
