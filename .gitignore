@@ -52,6 +52,9 @@ migration-errors.log
 # backups
 backups/
 
+# generated CRM import review artifacts; may contain member-only archive context
+/exports/memory-crm-import-preview/
+
 #Agents
 .claude/
 .agents/
