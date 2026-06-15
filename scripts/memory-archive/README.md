@@ -13,15 +13,29 @@ Default scope:
 - excludes possible duplicates
 - keeps internal raid-party people as provenance, not CRM contacts
 
+Relationship history scope:
+
+- includes `RAIDING`, `PREPARING`, and high-scoring `SHIPPED` records
+- defaults to `--min-score=10`
+- groups known same-client project families into one account with multiple opportunities
+- keeps possible duplicates out of the import draft for review
+
 Run:
 
 ```bash
 node scripts/memory-archive/prepare-crm-import.mjs
 ```
 
+Run the approved relationship-history preview:
+
+```bash
+pnpm memory:crm:relationship-preview
+```
+
 Useful options:
 
 ```bash
+node scripts/memory-archive/prepare-crm-import.mjs --profile=relationship-history --group-clients=false
 node scripts/memory-archive/prepare-crm-import.mjs --include-shipped=true
 node scripts/memory-archive/prepare-crm-import.mjs --include-duplicates=true
 node scripts/memory-archive/prepare-crm-import.mjs --min-score=10

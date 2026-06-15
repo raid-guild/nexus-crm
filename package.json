@@ -15,6 +15,7 @@
     "migrate:mongo-to-postgres": "pnpm exec tsx scripts/migrate-mongo-to-postgres.ts",
     "validate:migration": "pnpm exec tsx scripts/validate-migration.ts",
     "memory:crm:preview": "node scripts/memory-archive/prepare-crm-import.mjs",
+    "memory:crm:relationship-preview": "node scripts/memory-archive/prepare-crm-import.mjs --profile=relationship-history --out=exports/memory-crm-relationship-history-preview",
     "test": "jest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
