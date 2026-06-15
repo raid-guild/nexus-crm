@@ -65,8 +65,13 @@ async function checkPrismHealth(url: string | null): Promise<AiIntegrationStatus
 export async function getAiIntegrationStatus(): Promise<AiIntegrationStatus> {
   const embeddingConfig = getEmbeddingConfig();
   const baseURL = getOpenAICompatibleBaseURL() ?? "https://api.openai.com/v1";
-  const apiKeyConfigured =
-    hasEnv("OPENAI_API_KEY") || hasEnv("OPEN_AI_API_KEY") || hasEnv("VENICE_API_KEY");
+  const embeddingProvider = process.env.AI_EMBEDDINGS_PROVIDER?.trim()
+    || (baseURL.includes("venice.ai") ? "venice" : "openai-compatible");
+  const embeddingsUseVenice = embeddingProvider.toLowerCase() === "venice"
+    || baseURL.includes("venice.ai");
+  const apiKeyConfigured = embeddingsUseVenice
+    ? hasEnv("VENICE_API_KEY")
+    : hasEnv("OPENAI_API_KEY") || hasEnv("OPEN_AI_API_KEY") || hasEnv("VENICE_API_KEY");
   const agentURL = getAgentRuntimeURL();
   const agentTokenConfigured = hasEnv("PRISM_CODEX_RUNTIME_TOKEN");
   const agentHealth = await checkPrismHealth(agentURL);
@@ -84,7 +89,7 @@ export async function getAiIntegrationStatus(): Promise<AiIntegrationStatus> {
 
   return {
     embeddings: {
-      provider: process.env.AI_EMBEDDINGS_PROVIDER?.trim() || (baseURL.includes("venice.ai") ? "venice" : "openai-compatible"),
+      provider: embeddingProvider,
       state: apiKeyConfigured ? "ready" : "missing",
       apiKeyConfigured,
       baseURL,

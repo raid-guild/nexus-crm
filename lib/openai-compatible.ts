@@ -14,7 +14,7 @@ export function getOpenAICompatibleApiKey(): string | undefined {
   const baseURL = env("OPENAI_BASE_URL") ?? env("OPENAI_COMPATIBLE_BASE_URL");
 
   if (provider === "venice" || baseURL?.includes("venice.ai")) {
-    return env("VENICE_API_KEY") ?? env("OPENAI_API_KEY") ?? env("OPEN_AI_API_KEY");
+    return env("VENICE_API_KEY");
   }
 
   return env("OPENAI_API_KEY") ?? env("OPEN_AI_API_KEY") ?? env("VENICE_API_KEY");
@@ -45,7 +45,7 @@ export function getEmbeddingConfig() {
 export function createOpenAICompatibleClient(apiKey?: string): OpenAI {
   const resolvedApiKey = apiKey ?? getOpenAICompatibleApiKey();
   if (!resolvedApiKey) {
-    throw new Error("Missing OPENAI_API_KEY or VENICE_API_KEY");
+    throw new Error("Missing provider API key. Set VENICE_API_KEY for Venice or OPENAI_API_KEY for OpenAI-compatible providers.");
   }
 
   return new OpenAI({
