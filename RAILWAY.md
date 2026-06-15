@@ -45,6 +45,19 @@ For production login, `EMAIL_FROM` must be a SendGrid-verified sender or a
 sender on a SendGrid-authenticated domain. Resend is still supported by setting
 `RESEND_API_KEY` instead of `EMAIL_PROVIDER=sendgrid`.
 
+For Portal handoff login, configure the external module in Portal to callback to
+`https://your-nextcrm.up.railway.app/portal/callback`, set its launch audience
+and module slug to match the values below, and use the same shared secret in both
+apps:
+
+```txt
+PORTAL_MODULE_LAUNCH_SECRET=<same secret configured in Portal>
+PORTAL_LAUNCH_ISSUER=https://portal.raidguild.org
+PORTAL_LAUNCH_AUDIENCE=nexus
+PORTAL_LAUNCH_MODULE_SLUG=nexus
+PORTAL_LAUNCH_REDIRECT_PATH=/
+```
+
 For AI integrations, this fork is designed to keep secrets in Railway variables:
 
 ```txt

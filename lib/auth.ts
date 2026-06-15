@@ -5,6 +5,7 @@ import { admin as adminPlugin } from "better-auth/plugins";
 import { prismadb } from "@/lib/prisma";
 import { ac, admin, manager, user } from "@/lib/auth-permissions";
 import { newUserNotify } from "@/lib/new-user-notify";
+import { portalLaunchAuth } from "@/lib/portal-launch-auth";
 import resendHelper from "@/lib/resend";
 
 const isDemo = process.env.NEXT_PUBLIC_APP_URL === "https://demo.nextcrm.io";
@@ -102,6 +103,7 @@ export const auth = betterAuth({
       roles: { admin, manager, user },
       defaultRole: "user",
     }),
+    portalLaunchAuth(),
   ],
 
   account: {

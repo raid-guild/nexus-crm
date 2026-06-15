@@ -65,6 +65,11 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // Portal signed-launch callback must run before session enforcement.
+  if (path === "/portal/callback") {
+    return NextResponse.next();
+  }
+
   const sessionCookie = getSessionCookie(req);
 
   // Admin-only routes — require session cookie (role checked server-side)
