@@ -1,4 +1,5 @@
-import { getEmbeddingConfig, getOpenAICompatibleBaseURL, getOpenAIChatModel } from "./openai-compatible";
+import { getEmbeddingConfig, getOpenAICompatibleBaseURL } from "./openai-compatible";
+import { getDocumentAiModel, getDocumentAiProvider } from "./document-ai";
 
 type IntegrationState = "ready" | "missing" | "partial";
 
@@ -20,8 +21,12 @@ export type AiIntegrationStatus = {
     health: "not_configured" | "reachable" | "failed";
   };
   documentAi: {
+    provider: string;
     state: IntegrationState;
     model: string;
+    runtimeUrlConfigured: boolean;
+    runtimeTokenConfigured: boolean;
+    health: "not_configured" | "reachable" | "failed" | "not_applicable";
   };
 };
 
@@ -65,6 +70,17 @@ export async function getAiIntegrationStatus(): Promise<AiIntegrationStatus> {
   const agentURL = getAgentRuntimeURL();
   const agentTokenConfigured = hasEnv("PRISM_CODEX_RUNTIME_TOKEN");
   const agentHealth = await checkPrismHealth(agentURL);
+  const documentAiProvider = getDocumentAiProvider();
+  const documentAiUsesPrism = documentAiProvider === "prism";
+  const documentAiState = documentAiUsesPrism
+    ? !agentURL
+      ? "missing"
+      : agentHealth === "reachable"
+        ? "ready"
+        : "partial"
+    : apiKeyConfigured
+      ? "ready"
+      : "missing";
 
   return {
     embeddings: {
@@ -84,8 +100,12 @@ export async function getAiIntegrationStatus(): Promise<AiIntegrationStatus> {
       health: agentHealth,
     },
     documentAi: {
-      state: apiKeyConfigured ? "ready" : "missing",
-      model: getOpenAIChatModel(),
+      provider: documentAiProvider,
+      state: documentAiState,
+      model: getDocumentAiModel(),
+      runtimeUrlConfigured: documentAiUsesPrism ? Boolean(agentURL) : false,
+      runtimeTokenConfigured: documentAiUsesPrism ? agentTokenConfigured : false,
+      health: documentAiUsesPrism ? agentHealth : "not_applicable",
     },
   };
 }

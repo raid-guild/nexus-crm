@@ -66,6 +66,8 @@ VENICE_API_KEY=<venice-api-key>
 OPENAI_BASE_URL=https://api.venice.ai/api/v1
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 OPENAI_EMBEDDING_DIMENSIONS=1536
+DOCUMENT_AI_PROVIDER=prism
+DOCUMENT_AI_MODEL=prism-codex-runtime
 AI_AGENT_PROVIDER=prism
 PRISM_CODEX_RUNTIME_URL=https://your-codex-runtime.up.railway.app
 PRISM_CODEX_RUNTIME_TOKEN=<runtime-token-if-required>
@@ -73,6 +75,10 @@ PRISM_CODEX_RUNTIME_TOKEN=<runtime-token-if-required>
 
 `OPENAI_EMBEDDING_DIMENSIONS` must match the pgvector schema. The current schema
 uses `vector(1536)`.
+
+`DOCUMENT_AI_PROVIDER=prism` routes document summaries and document
+classification through the Prism Codex Runtime. Leave it as
+`openai-compatible` to use the OpenAI-compatible chat endpoint instead.
 
 ## 3. Deploy
 

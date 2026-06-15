@@ -142,13 +142,28 @@ export default async function LlmKeysPage() {
             <CardDescription>Summary and document classification model</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="space-y-1 text-sm">
+              <p className="font-medium">{status.documentAi.provider}</p>
+            </div>
             <div className="flex justify-between gap-3 text-sm">
               <span className="text-muted-foreground">Chat model</span>
               <span className="text-right font-mono text-xs">{status.documentAi.model}</span>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Uses the same OpenAI-compatible endpoint and API key as embeddings.
-            </p>
+            {status.documentAi.provider === "prism" ? (
+              <div className="grid gap-2">
+                <BooleanStatus value={status.documentAi.runtimeUrlConfigured} label="Runtime URL configured" />
+                <BooleanStatus value={status.documentAi.runtimeTokenConfigured} label="Auth token configured" />
+                <div className="flex items-center gap-2 text-sm">
+                  <Server className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Health:</span>
+                  <span className="capitalize">{status.documentAi.health.replace("_", " ")}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Uses the OpenAI-compatible endpoint and API key.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
