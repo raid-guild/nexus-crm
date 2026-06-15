@@ -4,7 +4,7 @@ import {
   getOpenAIChatModel,
 } from "./openai-compatible";
 
-type DocumentAiProvider = "openai-compatible" | "prism";
+type DocumentAiProvider = "openai-compatible" | "prism" | "prism-codex";
 
 function env(name: string): string | undefined {
   const value = process.env[name]?.trim();
@@ -12,13 +12,14 @@ function env(name: string): string | undefined {
 }
 
 export function getDocumentAiProvider(): DocumentAiProvider {
-  return env("DOCUMENT_AI_PROVIDER")?.toLowerCase() === "prism"
-    ? "prism"
-    : "openai-compatible";
+  const provider = env("DOCUMENT_AI_PROVIDER")?.toLowerCase();
+  if (provider === "prism") return "prism";
+  if (provider === "prism-codex") return "prism-codex";
+  return "openai-compatible";
 }
 
 export function getDocumentAiModel(): string {
-  return getDocumentAiProvider() === "prism"
+  return getDocumentAiProvider().startsWith("prism")
     ? env("DOCUMENT_AI_MODEL") ?? "prism-codex-runtime"
     : getOpenAIChatModel();
 }
@@ -64,7 +65,7 @@ export async function summarizeDocumentWithAi(content: string): Promise<string |
   const system =
     "Summarize the following document in 2-3 concise sentences. Focus on the key purpose and contents.";
 
-  if (getDocumentAiProvider() === "prism") {
+  if (getDocumentAiProvider() === "prism-codex") {
     return runPrismDocumentPrompt({
       task: "summary",
       system,
@@ -89,7 +90,7 @@ export async function classifyDocumentWithAi(input: {
     "Classify this document into exactly one of these categories: RECEIPT, CONTRACT, OFFER, OTHER. Respond with only the category name, nothing else.";
   const user = `Document name: ${input.documentName}\n\nSummary: ${input.summary}\n\nContent excerpt:\n${truncated}`;
 
-  const rawResponse = getDocumentAiProvider() === "prism"
+  const rawResponse = getDocumentAiProvider() === "prism-codex"
     ? await runPrismDocumentPrompt({
         task: "classification",
         system,

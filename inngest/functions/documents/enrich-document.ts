@@ -9,8 +9,10 @@ import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { minioClient, MINIO_BUCKET } from "@/lib/minio";
 import {
   classifyDocumentWithAi,
+  getDocumentAiProvider,
   summarizeDocumentWithAi,
 } from "@/lib/document-ai";
+import { handoffDocumentToPrism } from "@/lib/prism-integration";
 
 const CHUNK_SIZE = 512; // tokens (approx 4 chars per token)
 const CHUNK_OVERLAP = 50;
@@ -171,6 +173,10 @@ export const enrichDocument = inngest.createFunction(
 
     // Step 3: Generate summary
     const summary = await step.run("generate-summary", async () => {
+      if (getDocumentAiProvider() === "prism") {
+        return null;
+      }
+
       const summaryText = await summarizeDocumentWithAi(contentText);
       await prismadb.documents.update({
         where: { id: documentId },
@@ -180,12 +186,14 @@ export const enrichDocument = inngest.createFunction(
     });
 
     // Step 4: AI classification
-    await step.run("ai-classify", async () => {
-      const systemType = await classifyDocumentWithAi({
-        documentName: document.document_name,
-        summary,
-        content: contentText,
-      });
+    const systemType = await step.run("ai-classify", async () => {
+      const systemType = getDocumentAiProvider() === "prism"
+        ? classifyByFilename(document.document_name)
+        : await classifyDocumentWithAi({
+            documentName: document.document_name,
+            summary,
+            content: contentText,
+          });
 
       await prismadb.documents.update({
         where: { id: documentId },
@@ -194,7 +202,36 @@ export const enrichDocument = inngest.createFunction(
           processing_status: "READY",
         },
       });
+      return systemType;
     });
+
+    if (getDocumentAiProvider() === "prism") {
+      await step.run("handoff-to-prism", async () => {
+        const result = await handoffDocumentToPrism({
+          documentId,
+          documentName: document.document_name,
+          mimeType: document.document_file_mimeType,
+          contentText,
+          summary,
+          systemType,
+          sourceUrl: document.key ? `minio://${MINIO_BUCKET}/${document.key}` : null,
+          contentHash: computeContentHash(contentText),
+        });
+
+        await prismadb.documents.update({
+          where: { id: documentId },
+          data: {
+            prism_enrichment_status: result.status,
+            prism_run_id: result.hookRunId ?? result.hookRequestId ?? null,
+            prism_artifact_id: result.hookArtifactId ?? result.memoryInboxId ?? null,
+            prism_memory_url: result.memoryInboxUrl ?? null,
+            processing_error: result.errors.length ? result.errors.join("\n") : null,
+          },
+        });
+
+        return result;
+      });
+    }
 
     return { documentId, status: "ready", enriched: true };
   }

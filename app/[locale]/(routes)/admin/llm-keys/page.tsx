@@ -151,6 +151,14 @@ export default async function LlmKeysPage() {
             </div>
             {status.documentAi.provider === "prism" ? (
               <div className="grid gap-2">
+                <BooleanStatus value={status.documentAi.agentApiConfigured} label="Agent API configured" />
+                <BooleanStatus value={status.documentAi.memoryApiConfigured} label="Memory API configured" />
+                <p className="text-sm text-muted-foreground">
+                  Sends extracted CRM document text to Prism Memory and the crm-document-uploaded hook.
+                </p>
+              </div>
+            ) : status.documentAi.provider === "prism-codex" ? (
+              <div className="grid gap-2">
                 <BooleanStatus value={status.documentAi.runtimeUrlConfigured} label="Runtime URL configured" />
                 <BooleanStatus value={status.documentAi.runtimeTokenConfigured} label="Auth token configured" />
                 <div className="flex items-center gap-2 text-sm">

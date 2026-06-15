@@ -67,18 +67,24 @@ OPENAI_BASE_URL=https://api.venice.ai/api/v1
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 OPENAI_EMBEDDING_DIMENSIONS=1536
 DOCUMENT_AI_PROVIDER=prism
-DOCUMENT_AI_MODEL=prism-codex-runtime
+DOCUMENT_AI_MODEL=prism-agent-workflow
 AI_AGENT_PROVIDER=prism
-PRISM_CODEX_RUNTIME_URL=https://your-codex-runtime.up.railway.app
-PRISM_CODEX_RUNTIME_TOKEN=<runtime-token-if-required>
+PRISM_AGENT_API_BASE_URL=https://prism.raidguild.org
+PRISM_AGENT_SERVICE_TOKEN=<agent-service-token>
+PRISM_DOCUMENT_HOOK_KEY=crm-document-uploaded
+PRISM_MEMORY_BASE_URL=https://prism.raidguild.org
+PRISM_API_KEY=<memory-api-key>
 ```
 
 `OPENAI_EMBEDDING_DIMENSIONS` must match the pgvector schema. The current schema
 uses `vector(1536)`.
 
-`DOCUMENT_AI_PROVIDER=prism` routes document summaries and document
-classification through the Prism Codex Runtime. Leave it as
-`openai-compatible` to use the OpenAI-compatible chat endpoint instead.
+`DOCUMENT_AI_PROVIDER=prism` keeps CRM-owned upload, text extraction,
+embeddings, and database updates, then sends extracted document text and
+metadata to Prism Memory and triggers the Prism Agent API hook named by
+`PRISM_DOCUMENT_HOOK_KEY`. Use `DOCUMENT_AI_PROVIDER=prism-codex` only when you
+explicitly want direct synchronous Codex Runtime prompting through
+`PRISM_CODEX_RUNTIME_URL`.
 
 ## 3. Deploy
 

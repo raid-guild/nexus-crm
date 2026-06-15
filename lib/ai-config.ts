@@ -1,5 +1,6 @@
 import { getEmbeddingConfig, getOpenAICompatibleBaseURL } from "./openai-compatible";
 import { getDocumentAiModel, getDocumentAiProvider } from "./document-ai";
+import { getPrismIntegrationConfig, isPrismAgentConfigured, isPrismMemoryConfigured } from "./prism-integration";
 
 type IntegrationState = "ready" | "missing" | "partial";
 
@@ -26,6 +27,8 @@ export type AiIntegrationStatus = {
     model: string;
     runtimeUrlConfigured: boolean;
     runtimeTokenConfigured: boolean;
+    agentApiConfigured: boolean;
+    memoryApiConfigured: boolean;
     health: "not_configured" | "reachable" | "failed" | "not_applicable";
   };
 };
@@ -77,12 +80,22 @@ export async function getAiIntegrationStatus(): Promise<AiIntegrationStatus> {
   const agentHealth = await checkPrismHealth(agentURL);
   const documentAiProvider = getDocumentAiProvider();
   const documentAiUsesPrism = documentAiProvider === "prism";
+  const documentAiUsesCodex = documentAiProvider === "prism-codex";
+  const prismConfig = getPrismIntegrationConfig();
+  const prismAgentConfigured = isPrismAgentConfigured();
+  const prismMemoryConfigured = isPrismMemoryConfigured();
   const documentAiState = documentAiUsesPrism
-    ? !agentURL
-      ? "missing"
-      : agentHealth === "reachable"
+    ? prismAgentConfigured || prismMemoryConfigured
+      ? prismAgentConfigured && prismMemoryConfigured
         ? "ready"
         : "partial"
+      : "missing"
+    : documentAiUsesCodex
+      ? !agentURL
+        ? "missing"
+        : agentHealth === "reachable"
+          ? "ready"
+          : "partial"
     : apiKeyConfigured
       ? "ready"
       : "missing";
@@ -108,9 +121,15 @@ export async function getAiIntegrationStatus(): Promise<AiIntegrationStatus> {
       provider: documentAiProvider,
       state: documentAiState,
       model: getDocumentAiModel(),
-      runtimeUrlConfigured: documentAiUsesPrism ? Boolean(agentURL) : false,
-      runtimeTokenConfigured: documentAiUsesPrism ? agentTokenConfigured : false,
-      health: documentAiUsesPrism ? agentHealth : "not_applicable",
+      runtimeUrlConfigured: documentAiUsesCodex ? Boolean(agentURL) : false,
+      runtimeTokenConfigured: documentAiUsesCodex ? agentTokenConfigured : false,
+      agentApiConfigured: documentAiUsesPrism
+        ? Boolean(prismConfig.agentBaseURL && prismConfig.agentServiceToken)
+        : false,
+      memoryApiConfigured: documentAiUsesPrism
+        ? Boolean(prismConfig.memoryBaseURL && prismConfig.memoryApiKey)
+        : false,
+      health: documentAiUsesCodex ? agentHealth : "not_applicable",
     },
   };
 }
