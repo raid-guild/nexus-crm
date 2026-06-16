@@ -1,12 +1,13 @@
 import { z } from "zod";
 import { prismadb } from "@/lib/prisma";
+import { accountReadScopeWhere } from "@/lib/authz";
+import { getMcpAuthzUser } from "@/lib/mcp/authz";
 import {
   paginationSchema,
   paginationArgs,
   listResponse,
   itemResponse,
   ilike,
-  isNotDeleted,
   notFound,
   softDeleteData,
 } from "../helpers";
@@ -14,12 +15,13 @@ import {
 export const crmAccountTools = [
   {
     name: "crm_list_accounts",
-    description: "List CRM accounts assigned to the authenticated user",
+    description: "List CRM accounts visible to the authenticated user",
     schema: z.object({
       ...paginationSchema,
     }),
     async handler(args: { limit: number; offset: number }, userId: string) {
-      const where = { assigned_to: userId, ...isNotDeleted() };
+      const user = await getMcpAuthzUser(userId);
+      const where = accountReadScopeWhere(user);
       const [data, total] = await Promise.all([
         prismadb.crm_Accounts.findMany({
           where,
@@ -36,8 +38,9 @@ export const crmAccountTools = [
     description: "Get a single CRM account by ID",
     schema: z.object({ id: z.string().uuid() }),
     async handler(args: { id: string }, userId: string) {
+      const user = await getMcpAuthzUser(userId);
       const account = await prismadb.crm_Accounts.findFirst({
-        where: { id: args.id, assigned_to: userId, ...isNotDeleted() },
+        where: { id: args.id, ...accountReadScopeWhere(user) },
       });
       if (!account) notFound("Account");
       return itemResponse(account);
@@ -54,10 +57,12 @@ export const crmAccountTools = [
       args: { query: string; limit: number; offset: number },
       userId: string
     ) {
+      const user = await getMcpAuthzUser(userId);
       const where = {
-        assigned_to: userId,
-        ...isNotDeleted(),
-        OR: [ilike("name", args.query), ilike("website", args.query)],
+        AND: [
+          accountReadScopeWhere(user),
+          { OR: [ilike("name", args.query), ilike("website", args.query)] },
+        ],
       };
       const [data, total] = await Promise.all([
         prismadb.crm_Accounts.findMany({
@@ -127,8 +132,9 @@ export const crmAccountTools = [
       },
       userId: string
     ) {
+      const user = await getMcpAuthzUser(userId);
       const existing = await prismadb.crm_Accounts.findFirst({
-        where: { id: args.id, assigned_to: userId, ...isNotDeleted() },
+        where: { id: args.id, ...accountReadScopeWhere(user) },
       });
       if (!existing) notFound("Account");
       const { id, ...updateData } = args;
@@ -144,8 +150,9 @@ export const crmAccountTools = [
     description: "Soft-delete a CRM account by ID (sets deletedAt timestamp)",
     schema: z.object({ id: z.string().uuid() }),
     async handler(args: { id: string }, userId: string) {
+      const user = await getMcpAuthzUser(userId);
       const existing = await prismadb.crm_Accounts.findFirst({
-        where: { id: args.id, assigned_to: userId, ...isNotDeleted() },
+        where: { id: args.id, ...accountReadScopeWhere(user) },
       });
       if (!existing) notFound("Account");
       const account = await prismadb.crm_Accounts.update({

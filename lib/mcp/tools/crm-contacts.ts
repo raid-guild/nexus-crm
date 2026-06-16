@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { prismadb } from "@/lib/prisma";
+import { contactReadScopeWhere } from "@/lib/authz";
+import { getMcpAuthzUser } from "@/lib/mcp/authz";
 import {
   paginationSchema,
   paginationArgs,
@@ -13,10 +15,11 @@ import {
 export const crmContactTools = [
   {
     name: "crm_list_contacts",
-    description: "List CRM contacts assigned to the authenticated user",
+    description: "List CRM contacts visible to the authenticated user",
     schema: z.object({ ...paginationSchema }),
     async handler(args: { limit: number; offset: number }, userId: string) {
-      const where = { assigned_to: userId, deletedAt: null };
+      const user = await getMcpAuthzUser(userId);
+      const where = contactReadScopeWhere(user);
       const [data, total] = await Promise.all([
         prismadb.crm_Contacts.findMany({
           where,
@@ -33,8 +36,9 @@ export const crmContactTools = [
     description: "Get a single CRM contact by ID",
     schema: z.object({ id: z.string().uuid() }),
     async handler(args: { id: string }, userId: string) {
+      const user = await getMcpAuthzUser(userId);
       const contact = await prismadb.crm_Contacts.findFirst({
-        where: { id: args.id, assigned_to: userId, deletedAt: null },
+        where: { id: args.id, ...contactReadScopeWhere(user) },
       });
       if (!contact) notFound("Contact");
       return itemResponse(contact);
@@ -48,15 +52,19 @@ export const crmContactTools = [
       args: { query: string; limit: number; offset: number },
       userId: string
     ) {
+      const user = await getMcpAuthzUser(userId);
       const where = {
-        assigned_to: userId,
-        deletedAt: null,
-        OR: [
-          ilike("first_name", args.query),
-          ilike("last_name", args.query),
-          ilike("email", args.query),
-          ilike("office_phone", args.query),
-          ilike("mobile_phone", args.query),
+        AND: [
+          contactReadScopeWhere(user),
+          {
+            OR: [
+              ilike("first_name", args.query),
+              ilike("last_name", args.query),
+              ilike("email", args.query),
+              ilike("office_phone", args.query),
+              ilike("mobile_phone", args.query),
+            ],
+          },
         ],
       };
       const [data, total] = await Promise.all([
@@ -130,8 +138,9 @@ export const crmContactTools = [
       },
       userId: string
     ) {
+      const user = await getMcpAuthzUser(userId);
       const existing = await prismadb.crm_Contacts.findFirst({
-        where: { id: args.id, assigned_to: userId, deletedAt: null },
+        where: { id: args.id, ...contactReadScopeWhere(user) },
       });
       if (!existing) notFound("Contact");
       const { id, ...updateData } = args;
@@ -147,8 +156,9 @@ export const crmContactTools = [
     description: "Soft-delete a CRM contact by ID (sets deletedAt timestamp)",
     schema: z.object({ id: z.string().uuid() }),
     async handler(args: { id: string }, userId: string) {
+      const user = await getMcpAuthzUser(userId);
       const existing = await prismadb.crm_Contacts.findFirst({
-        where: { id: args.id, assigned_to: userId, deletedAt: null },
+        where: { id: args.id, ...contactReadScopeWhere(user) },
       });
       if (!existing) notFound("Contact");
       const contact = await prismadb.crm_Contacts.update({
