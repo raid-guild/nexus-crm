@@ -1,7 +1,5 @@
 import { z } from "zod";
 import { prismadb } from "@/lib/prisma";
-import { leadReadScopeWhere } from "@/lib/authz";
-import { getMcpAuthzUser } from "@/lib/mcp/authz";
 import {
   paginationSchema,
   paginationArgs,
@@ -15,11 +13,10 @@ import {
 export const crmLeadTools = [
   {
     name: "crm_list_leads",
-    description: "List CRM leads visible to the authenticated user",
+    description: "List CRM leads assigned to the authenticated user",
     schema: z.object({ ...paginationSchema }),
     async handler(args: { limit: number; offset: number }, userId: string) {
-      const user = await getMcpAuthzUser(userId);
-      const where = leadReadScopeWhere(user);
+      const where = { assigned_to: userId, deletedAt: null };
       const [data, total] = await Promise.all([
         prismadb.crm_Leads.findMany({
           where,
@@ -36,9 +33,8 @@ export const crmLeadTools = [
     description: "Get a single CRM lead by ID",
     schema: z.object({ id: z.string().uuid() }),
     async handler(args: { id: string }, userId: string) {
-      const user = await getMcpAuthzUser(userId);
       const lead = await prismadb.crm_Leads.findFirst({
-        where: { id: args.id, ...leadReadScopeWhere(user) },
+        where: { id: args.id, assigned_to: userId, deletedAt: null },
       });
       if (!lead) notFound("Lead");
       return itemResponse(lead);
@@ -52,18 +48,14 @@ export const crmLeadTools = [
       args: { query: string; limit: number; offset: number },
       userId: string
     ) {
-      const user = await getMcpAuthzUser(userId);
       const where = {
-        AND: [
-          leadReadScopeWhere(user),
-          {
-            OR: [
-              ilike("firstName", args.query),
-              ilike("lastName", args.query),
-              ilike("email", args.query),
-              ilike("company", args.query),
-            ],
-          },
+        assigned_to: userId,
+        deletedAt: null,
+        OR: [
+          ilike("firstName", args.query),
+          ilike("lastName", args.query),
+          ilike("email", args.query),
+          ilike("company", args.query),
         ],
       };
       const [data, total] = await Promise.all([
@@ -130,9 +122,8 @@ export const crmLeadTools = [
       },
       userId: string
     ) {
-      const user = await getMcpAuthzUser(userId);
       const existing = await prismadb.crm_Leads.findFirst({
-        where: { id: args.id, ...leadReadScopeWhere(user) },
+        where: { id: args.id, assigned_to: userId, deletedAt: null },
       });
       if (!existing) notFound("Lead");
       const { id, ...updateData } = args;
@@ -148,9 +139,8 @@ export const crmLeadTools = [
     description: "Soft-delete a CRM lead by ID (sets deletedAt timestamp)",
     schema: z.object({ id: z.string().uuid() }),
     async handler(args: { id: string }, userId: string) {
-      const user = await getMcpAuthzUser(userId);
       const existing = await prismadb.crm_Leads.findFirst({
-        where: { id: args.id, ...leadReadScopeWhere(user) },
+        where: { id: args.id, assigned_to: userId, deletedAt: null },
       });
       if (!existing) notFound("Lead");
       const lead = await prismadb.crm_Leads.update({

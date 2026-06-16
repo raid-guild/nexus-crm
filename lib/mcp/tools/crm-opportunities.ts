@@ -1,7 +1,5 @@
 import { z } from "zod";
 import { prismadb } from "@/lib/prisma";
-import { opportunityReadScopeWhere } from "@/lib/authz";
-import { getMcpAuthzUser } from "@/lib/mcp/authz";
 import {
   paginationSchema,
   paginationArgs,
@@ -15,11 +13,10 @@ import {
 export const crmOpportunityTools = [
   {
     name: "crm_list_opportunities",
-    description: "List CRM opportunities visible to the authenticated user",
+    description: "List CRM opportunities assigned to the authenticated user",
     schema: z.object({ ...paginationSchema }),
     async handler(args: { limit: number; offset: number }, userId: string) {
-      const user = await getMcpAuthzUser(userId);
-      const where = opportunityReadScopeWhere(user);
+      const where = { assigned_to: userId, deletedAt: null };
       const [data, total] = await Promise.all([
         prismadb.crm_Opportunities.findMany({
           where,
@@ -36,9 +33,8 @@ export const crmOpportunityTools = [
     description: "Get a single CRM opportunity by ID",
     schema: z.object({ id: z.string().uuid() }),
     async handler(args: { id: string }, userId: string) {
-      const user = await getMcpAuthzUser(userId);
       const opp = await prismadb.crm_Opportunities.findFirst({
-        where: { id: args.id, ...opportunityReadScopeWhere(user) },
+        where: { id: args.id, assigned_to: userId, deletedAt: null },
       });
       if (!opp) notFound("Opportunity");
       return itemResponse(opp);
@@ -52,12 +48,10 @@ export const crmOpportunityTools = [
       args: { query: string; limit: number; offset: number },
       userId: string
     ) {
-      const user = await getMcpAuthzUser(userId);
       const where = {
-        AND: [
-          opportunityReadScopeWhere(user),
-          { OR: [ilike("name", args.query), ilike("description", args.query)] },
-        ],
+        assigned_to: userId,
+        deletedAt: null,
+        OR: [ilike("name", args.query), ilike("description", args.query)],
       };
       const [data, total] = await Promise.all([
         prismadb.crm_Opportunities.findMany({
@@ -137,9 +131,8 @@ export const crmOpportunityTools = [
       },
       userId: string
     ) {
-      const user = await getMcpAuthzUser(userId);
       const existing = await prismadb.crm_Opportunities.findFirst({
-        where: { id: args.id, ...opportunityReadScopeWhere(user) },
+        where: { id: args.id, assigned_to: userId, deletedAt: null },
       });
       if (!existing) notFound("Opportunity");
       const { id, budget, expected_revenue, close_date, currency, ...rest } = args;
@@ -162,9 +155,8 @@ export const crmOpportunityTools = [
     description: "Soft-delete a CRM opportunity by ID",
     schema: z.object({ id: z.string().uuid() }),
     async handler(args: { id: string }, userId: string) {
-      const user = await getMcpAuthzUser(userId);
       const existing = await prismadb.crm_Opportunities.findFirst({
-        where: { id: args.id, ...opportunityReadScopeWhere(user) },
+        where: { id: args.id, assigned_to: userId, deletedAt: null },
       });
       if (!existing) notFound("Opportunity");
       const opp = await prismadb.crm_Opportunities.update({
