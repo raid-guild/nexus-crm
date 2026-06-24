@@ -14,7 +14,6 @@ const LeadsPage = async () => {
   const crmData = await getAllCrmData();
   const leads = await getLeads();
 
-  console.log(leads[0], "leads");
   return (
     <Container
       title={t("leads.pageTitle")}

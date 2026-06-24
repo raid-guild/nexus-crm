@@ -21,9 +21,14 @@ export const getLeads = cache(async () => {
       // Include assigned user (uses "LeadAssignedTo" relation)
       assigned_to_user: {
         select: {
+          id: true,
           name: true,
+          avatar: true,
         },
       },
+      lead_source: { select: { id: true, name: true } },
+      lead_status: { select: { id: true, name: true } },
+      lead_type: { select: { id: true, name: true } },
       // Include assigned accounts
       assigned_accounts: true,
       // Include documents through DocumentsToLeads junction table
