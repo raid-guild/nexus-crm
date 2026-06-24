@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import {
   Building2,
   CalendarDays,
+  Columns3,
   GripVertical,
   Mail,
   Phone,
@@ -41,6 +42,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
@@ -94,9 +101,40 @@ type LeadDetailPayload = {
 };
 
 const UNCATEGORIZED_STATUS_ID = "uncategorized";
+const PREFERRED_COLUMN_ORDER = [
+  "Uncategorized",
+  "New",
+  "Contacted",
+  "Qualified",
+  "Lost",
+];
 
 function getLeadName(lead: Lead) {
   return [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "Unnamed lead";
+}
+
+function normalizeColumnName(name: string) {
+  return name.trim().toLowerCase();
+}
+
+function sortColumns(columns: Column[]) {
+  const order = new Map(
+    PREFERRED_COLUMN_ORDER.map((name, index) => [
+      normalizeColumnName(name),
+      index,
+    ])
+  );
+
+  return [...columns].sort((a, b) => {
+    const aOrder = order.get(normalizeColumnName(a.name));
+    const bOrder = order.get(normalizeColumnName(b.name));
+
+    if (aOrder !== undefined && bOrder !== undefined) return aOrder - bOrder;
+    if (aOrder !== undefined) return -1;
+    if (bOrder !== undefined) return 1;
+
+    return a.name.localeCompare(b.name);
+  });
 }
 
 function initColumns(leads: Lead[], statuses: ConfigItem[]): Column[] {
@@ -129,11 +167,7 @@ function initColumns(leads: Lead[], statuses: ConfigItem[]): Column[] {
 
   const uncategorized = leads.filter((lead) => !lead.lead_status_id);
 
-  if (uncategorized.length === 0) {
-    return [...statusColumns, ...missingStatusColumns];
-  }
-
-  return [
+  const columns = [
     ...statusColumns,
     ...missingStatusColumns,
     {
@@ -142,6 +176,8 @@ function initColumns(leads: Lead[], statuses: ConfigItem[]): Column[] {
       leads: uncategorized,
     },
   ];
+
+  return sortColumns(columns);
 }
 
 function DroppableColumn({
@@ -365,6 +401,7 @@ export function LeadKanbanBoard({
 }) {
   const router = useRouter();
   const statuses = crmData.leadStatuses;
+  const [hiddenColumnIds, setHiddenColumnIds] = useState<string[]>([]);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [detail, setDetail] = useState<LeadDetailPayload | null>(null);
   const [isDetailPending, startDetailTransition] = useTransition();
@@ -379,8 +416,12 @@ export function LeadKanbanBoard({
     columnState?.data === data && columnState?.statuses === statuses
       ? columnState.columns
       : baseColumns;
+  const visibleColumns = useMemo(
+    () => columns.filter((column) => !hiddenColumnIds.includes(column.id)),
+    [columns, hiddenColumnIds]
+  );
   const columnsRef = useRef<Column[]>(
-    columnState?.columns ?? baseColumns
+    visibleColumns
   );
 
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
@@ -388,8 +429,8 @@ export function LeadKanbanBoard({
   const isDraggingRef = useRef(false);
 
   useEffect(() => {
-    columnsRef.current = columns;
-  }, [columns]);
+    columnsRef.current = visibleColumns;
+  }, [visibleColumns]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -402,6 +443,14 @@ export function LeadKanbanBoard({
       return acc;
     }, {});
   }, [columns]);
+
+  const toggleColumn = (columnId: string) => {
+    setHiddenColumnIds((current) =>
+      current.includes(columnId)
+        ? current.filter((id) => id !== columnId)
+        : [...current, columnId]
+    );
+  };
 
   const openLead = (leadId: string) => {
     setSelectedLeadId(leadId);
@@ -441,12 +490,10 @@ export function LeadKanbanBoard({
     const current = columnsRef.current;
 
     let fromColIdx = -1;
-    let fromLeadIdx = -1;
     for (let i = 0; i < current.length; i++) {
       const index = current[i].leads.findIndex((lead) => lead.id === activeId);
       if (index !== -1) {
         fromColIdx = i;
-        fromLeadIdx = index;
         break;
       }
     }
@@ -471,23 +518,48 @@ export function LeadKanbanBoard({
 
     if (toColIdx === -1 || fromColIdx === toColIdx) return;
 
-    const newColumns = current.map((column) => ({
+    const newColumns = columns.map((column) => ({
       ...column,
       leads: [...column.leads],
     }));
 
-    const [movedLead] = newColumns[fromColIdx].leads.splice(fromLeadIdx, 1);
-    movedLead.lead_status_id =
-      newColumns[toColIdx].id === UNCATEGORIZED_STATUS_ID
-        ? null
-        : newColumns[toColIdx].id;
-    movedLead.lead_status =
-      newColumns[toColIdx].id === UNCATEGORIZED_STATUS_ID
-        ? null
-        : { id: newColumns[toColIdx].id, name: newColumns[toColIdx].name };
-    newColumns[toColIdx].leads.splice(toLeadIdx, 0, movedLead);
+    const sourceColumnId = current[fromColIdx].id;
+    const targetColumnId = current[toColIdx].id;
+    const sourceColumnIndex = newColumns.findIndex(
+      (column) => column.id === sourceColumnId
+    );
+    const targetColumnIndex = newColumns.findIndex(
+      (column) => column.id === targetColumnId
+    );
 
-    columnsRef.current = newColumns;
+    if (sourceColumnIndex === -1 || targetColumnIndex === -1) return;
+
+    const sourceLeadIndex = newColumns[sourceColumnIndex].leads.findIndex(
+      (lead) => lead.id === activeId
+    );
+
+    if (sourceLeadIndex === -1) return;
+
+    const [movedLead] = newColumns[sourceColumnIndex].leads.splice(
+      sourceLeadIndex,
+      1
+    );
+    movedLead.lead_status_id =
+      newColumns[targetColumnIndex].id === UNCATEGORIZED_STATUS_ID
+        ? null
+        : newColumns[targetColumnIndex].id;
+    movedLead.lead_status =
+      newColumns[targetColumnIndex].id === UNCATEGORIZED_STATUS_ID
+        ? null
+        : {
+            id: newColumns[targetColumnIndex].id,
+            name: newColumns[targetColumnIndex].name,
+          };
+    newColumns[targetColumnIndex].leads.splice(toLeadIdx, 0, movedLead);
+
+    columnsRef.current = newColumns.filter(
+      (column) => !hiddenColumnIds.includes(column.id)
+    );
     setColumnState({ data, statuses, columns: newColumns });
   };
 
@@ -538,6 +610,37 @@ export function LeadKanbanBoard({
 
   return (
     <>
+      <div className="mb-3 flex justify-end">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2">
+              <Columns3 className="h-4 w-4" />
+              Columns
+              {hiddenColumnIds.length > 0 ? (
+                <Badge variant="secondary">{hiddenColumnIds.length}</Badge>
+              ) : null}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            {columns.map((column) => (
+              <DropdownMenuCheckboxItem
+                key={column.id}
+                checked={!hiddenColumnIds.includes(column.id)}
+                onCheckedChange={() => toggleColumn(column.id)}
+                onSelect={(event) => event.preventDefault()}
+              >
+                <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                  <span className="truncate">{column.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {leadCountByStatus[column.id] ?? 0}
+                  </span>
+                </span>
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -546,7 +649,7 @@ export function LeadKanbanBoard({
         onDragEnd={handleDragEnd}
       >
         <div className="flex min-h-[620px] w-full gap-3 overflow-x-auto pb-3">
-          {columns.map((column) => (
+          {visibleColumns.map((column) => (
             <section
               key={column.id}
               className="flex w-[320px] shrink-0 flex-col rounded-md border bg-muted/30"
