@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import {
   Sidebar,
   SidebarContent,
@@ -27,7 +28,7 @@ import getCampaignsMenuItem from "./menu-items/Campaigns";
  *
  * Core sidebar component for NextCRM application layout.
  * Implements shadcn/ui sidebar pattern with:
- * - Logo and "N" branding symbol with rotation animation
+ * - Logo and branding symbol with rotation animation
  * - Build version display in footer (when expanded)
  * - Navigation with Dashboard and module items
  * - Nav-user section in footer for user profile and actions
@@ -52,7 +53,7 @@ import getCampaignsMenuItem from "./menu-items/Campaigns";
  *
  * Phase 5 Updates (Design Consistency):
  * - Task 5.3: Removed duration-200 from app name animation (uses Tailwind default)
- * - Task 5.3: Kept duration-500 on "N" symbol for intentional brand emphasis
+ * - Task 5.3: Kept duration-500 on brand symbol for intentional brand emphasis
  * - Task 5.4: Changed build version text-gray-500 to text-muted-foreground for theme support
  *
  * @param modules - Array of enabled modules from system_Modules_Enabled table
@@ -133,14 +134,21 @@ export function AppSidebar({
             isExpanded ? "gap-x-4" : "justify-center",
           )}
         >
-          {/* "N" Branding Symbol with rotation animation */}
+          {/* Branding Symbol with rotation animation */}
           <div
             className={cn(
-              "flex-shrink-0 border rounded-full px-4 py-2 transition-transform duration-500",
+              "flex-shrink-0 border rounded-full p-1 transition-transform duration-500",
               isExpanded && "rotate-[360deg]",
             )}
           >
-            N
+            <Image
+              src="/images/hunter.svg"
+              alt="The RaidGuild Nexus"
+              width={32}
+              height={32}
+              className="h-8 w-8 rounded-full object-contain"
+              priority
+            />
           </div>
 
           {/* App Name - visible when expanded, hidden when collapsed */}
