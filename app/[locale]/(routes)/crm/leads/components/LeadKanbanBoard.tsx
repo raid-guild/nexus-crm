@@ -104,8 +104,13 @@ const UNCATEGORIZED_STATUS_ID = "uncategorized";
 const PREFERRED_COLUMN_ORDER = [
   "Uncategorized",
   "New",
+  "Researching",
+  "Cold Outreach",
   "Contacted",
+  "Follow Up",
   "Qualified",
+  "Converted to Opportunity",
+  "Nurture",
   "Lost",
 ];
 
