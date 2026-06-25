@@ -8,9 +8,11 @@ import {
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { minioClient, MINIO_BUCKET } from "@/lib/minio";
 import {
-  createOpenAICompatibleClient,
-  getOpenAIChatModel,
-} from "@/lib/openai-compatible";
+  classifyDocumentWithAi,
+  getDocumentAiProvider,
+  summarizeDocumentWithAi,
+} from "@/lib/document-ai";
+import { handoffDocumentToPrism } from "@/lib/prism-integration";
 
 const CHUNK_SIZE = 512; // tokens (approx 4 chars per token)
 const CHUNK_OVERLAP = 50;
@@ -171,21 +173,11 @@ export const enrichDocument = inngest.createFunction(
 
     // Step 3: Generate summary
     const summary = await step.run("generate-summary", async () => {
-      const truncated = contentText.slice(0, 12000); // ~3000 tokens for summary input
-      const openai = createOpenAICompatibleClient();
-      const response = await openai.chat.completions.create({
-        model: getOpenAIChatModel(),
-        messages: [
-          {
-            role: "system",
-            content: "Summarize the following document in 2-3 concise sentences. Focus on the key purpose and contents.",
-          },
-          { role: "user", content: truncated },
-        ],
-        max_tokens: 200,
-      });
+      if (getDocumentAiProvider() === "prism") {
+        return null;
+      }
 
-      const summaryText = response.choices[0]?.message?.content ?? null;
+      const summaryText = await summarizeDocumentWithAi(contentText);
       await prismadb.documents.update({
         where: { id: documentId },
         data: { summary: summaryText },
@@ -194,29 +186,14 @@ export const enrichDocument = inngest.createFunction(
     });
 
     // Step 4: AI classification
-    await step.run("ai-classify", async () => {
-      const truncated = contentText.slice(0, 4000);
-      const openai = createOpenAICompatibleClient();
-      const response = await openai.chat.completions.create({
-        model: getOpenAIChatModel(),
-        messages: [
-          {
-            role: "system",
-            content:
-              "Classify this document into exactly one of these categories: RECEIPT, CONTRACT, OFFER, OTHER. Respond with only the category name, nothing else.",
-          },
-          {
-            role: "user",
-            content: `Document name: ${document.document_name}\n\nSummary: ${summary}\n\nContent excerpt:\n${truncated}`,
-          },
-        ],
-        max_tokens: 10,
-      });
-
-      const raw = response.choices[0]?.message?.content?.trim().toUpperCase() ?? "OTHER";
-      const systemType = ["RECEIPT", "CONTRACT", "OFFER", "OTHER"].includes(raw)
-        ? (raw as "RECEIPT" | "CONTRACT" | "OFFER" | "OTHER")
-        : "OTHER";
+    const systemType = await step.run("ai-classify", async () => {
+      const systemType = getDocumentAiProvider() === "prism"
+        ? classifyByFilename(document.document_name)
+        : await classifyDocumentWithAi({
+            documentName: document.document_name,
+            summary,
+            content: contentText,
+          });
 
       await prismadb.documents.update({
         where: { id: documentId },
@@ -225,7 +202,36 @@ export const enrichDocument = inngest.createFunction(
           processing_status: "READY",
         },
       });
+      return systemType;
     });
+
+    if (getDocumentAiProvider() === "prism") {
+      await step.run("handoff-to-prism", async () => {
+        const result = await handoffDocumentToPrism({
+          documentId,
+          documentName: document.document_name,
+          mimeType: document.document_file_mimeType,
+          contentText,
+          summary,
+          systemType,
+          sourceUrl: document.key ? `minio://${MINIO_BUCKET}/${document.key}` : null,
+          contentHash: computeContentHash(contentText),
+        });
+
+        await prismadb.documents.update({
+          where: { id: documentId },
+          data: {
+            prism_enrichment_status: result.status,
+            prism_run_id: result.hookRunId ?? result.hookRequestId ?? null,
+            prism_artifact_id: result.hookArtifactId ?? result.memoryInboxId ?? null,
+            prism_memory_url: result.memoryInboxUrl ?? null,
+            processing_error: result.errors.length ? result.errors.join("\n") : null,
+          },
+        });
+
+        return result;
+      });
+    }
 
     return { documentId, status: "ready", enriched: true };
   }

@@ -45,7 +45,7 @@ export function getEmbeddingConfig() {
 export function createOpenAICompatibleClient(apiKey?: string): OpenAI {
   const resolvedApiKey = apiKey ?? getOpenAICompatibleApiKey();
   if (!resolvedApiKey) {
-    throw new Error("Missing OPENAI_API_KEY or VENICE_API_KEY");
+    throw new Error("Missing provider API key. Set VENICE_API_KEY for Venice or OPENAI_API_KEY for OpenAI-compatible providers.");
   }
 
   return new OpenAI({

@@ -728,6 +728,10 @@ model Documents {
   thumbnail_url      String?
   processing_status  DocumentProcessingStatus @default(PENDING)
   processing_error   String?
+  prism_enrichment_status String?
+  prism_run_id            String?
+  prism_artifact_id       String?
+  prism_memory_url        String?
   version            Int                      @default(1)
   parent_document_id String?                  @db.Uuid
   deletedAt          DateTime?
@@ -760,6 +764,8 @@ model Documents {
   @@index([content_hash])
   @@index([parent_document_id])
   @@index([processing_status])
+  @@index([prism_enrichment_status])
+  @@index([prism_run_id])
   @@index([deletedAt])
 }
 

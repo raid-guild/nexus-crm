@@ -1,4 +1,6 @@
-import { getEmbeddingConfig, getOpenAICompatibleBaseURL, getOpenAIChatModel } from "./openai-compatible";
+import { getEmbeddingConfig, getOpenAICompatibleBaseURL } from "./openai-compatible";
+import { getDocumentAiModel, getDocumentAiProvider } from "./document-ai";
+import { getPrismIntegrationConfig, isPrismAgentConfigured, isPrismMemoryConfigured } from "./prism-integration";
 
 type IntegrationState = "ready" | "missing" | "partial";
 
@@ -20,8 +22,14 @@ export type AiIntegrationStatus = {
     health: "not_configured" | "reachable" | "failed";
   };
   documentAi: {
+    provider: string;
     state: IntegrationState;
     model: string;
+    runtimeUrlConfigured: boolean;
+    runtimeTokenConfigured: boolean;
+    agentApiConfigured: boolean;
+    memoryApiConfigured: boolean;
+    health: "not_configured" | "reachable" | "failed" | "not_applicable";
   };
 };
 
@@ -60,15 +68,41 @@ async function checkPrismHealth(url: string | null): Promise<AiIntegrationStatus
 export async function getAiIntegrationStatus(): Promise<AiIntegrationStatus> {
   const embeddingConfig = getEmbeddingConfig();
   const baseURL = getOpenAICompatibleBaseURL() ?? "https://api.openai.com/v1";
-  const apiKeyConfigured =
-    hasEnv("OPENAI_API_KEY") || hasEnv("OPEN_AI_API_KEY") || hasEnv("VENICE_API_KEY");
+  const embeddingProvider = process.env.AI_EMBEDDINGS_PROVIDER?.trim()
+    || (baseURL.includes("venice.ai") ? "venice" : "openai-compatible");
+  const embeddingsUseVenice = embeddingProvider.toLowerCase() === "venice"
+    || baseURL.includes("venice.ai");
+  const apiKeyConfigured = embeddingsUseVenice
+    ? hasEnv("VENICE_API_KEY")
+    : hasEnv("OPENAI_API_KEY") || hasEnv("OPEN_AI_API_KEY") || hasEnv("VENICE_API_KEY");
   const agentURL = getAgentRuntimeURL();
   const agentTokenConfigured = hasEnv("PRISM_CODEX_RUNTIME_TOKEN");
   const agentHealth = await checkPrismHealth(agentURL);
+  const documentAiProvider = getDocumentAiProvider();
+  const documentAiUsesPrism = documentAiProvider === "prism";
+  const documentAiUsesCodex = documentAiProvider === "prism-codex";
+  const prismConfig = getPrismIntegrationConfig();
+  const prismAgentConfigured = isPrismAgentConfigured();
+  const prismMemoryConfigured = isPrismMemoryConfigured();
+  const documentAiState = documentAiUsesPrism
+    ? prismAgentConfigured || prismMemoryConfigured
+      ? prismAgentConfigured && prismMemoryConfigured
+        ? "ready"
+        : "partial"
+      : "missing"
+    : documentAiUsesCodex
+      ? !agentURL
+        ? "missing"
+        : agentHealth === "reachable"
+          ? "ready"
+          : "partial"
+    : apiKeyConfigured
+      ? "ready"
+      : "missing";
 
   return {
     embeddings: {
-      provider: process.env.AI_EMBEDDINGS_PROVIDER?.trim() || (baseURL.includes("venice.ai") ? "venice" : "openai-compatible"),
+      provider: embeddingProvider,
       state: apiKeyConfigured ? "ready" : "missing",
       apiKeyConfigured,
       baseURL,
@@ -84,8 +118,18 @@ export async function getAiIntegrationStatus(): Promise<AiIntegrationStatus> {
       health: agentHealth,
     },
     documentAi: {
-      state: apiKeyConfigured ? "ready" : "missing",
-      model: getOpenAIChatModel(),
+      provider: documentAiProvider,
+      state: documentAiState,
+      model: getDocumentAiModel(),
+      runtimeUrlConfigured: documentAiUsesCodex ? Boolean(agentURL) : false,
+      runtimeTokenConfigured: documentAiUsesCodex ? agentTokenConfigured : false,
+      agentApiConfigured: documentAiUsesPrism
+        ? Boolean(prismConfig.agentBaseURL && prismConfig.agentServiceToken)
+        : false,
+      memoryApiConfigured: documentAiUsesPrism
+        ? Boolean(prismConfig.memoryBaseURL && prismConfig.memoryApiKey)
+        : false,
+      health: documentAiUsesCodex ? agentHealth : "not_applicable",
     },
   };
 }
