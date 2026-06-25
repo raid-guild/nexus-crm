@@ -61,7 +61,6 @@ const leadFieldSchema = {
   lead_type_id: z.string().uuid().optional(),
   refered_by: z.string().optional(),
   campaign: z.string().optional(),
-  assigned_to: z.string().uuid().optional(),
   accountIDs: z.string().uuid().optional(),
 };
 
@@ -86,6 +85,10 @@ function dedupeKeyForLead(
     })
     .filter(Boolean)
     .join("|");
+}
+
+function exactInsensitive(field: "email" | "company" | "phone", value: string) {
+  return { [field]: { equals: value, mode: "insensitive" as const } };
 }
 
 export const crmLeadTools = [
@@ -235,18 +238,17 @@ export const crmLeadTools = [
         lead_type_id?: string;
         refered_by?: string;
         campaign?: string;
-        assigned_to?: string;
         accountIDs?: string;
       },
       userId: string
     ) {
-      const { lastName, accountIDs, assigned_to, ...rest } = args;
+      const { lastName, accountIDs, ...rest } = args;
       const lead = await prismadb.crm_Leads.create({
         data: {
           v: 0,
           lastName,
           ...rest,
-          assigned_to: assigned_to ?? userId,
+          assigned_to: userId,
           accountsIDs: accountIDs,
           createdBy: userId,
           updatedBy: userId,
@@ -277,7 +279,6 @@ export const crmLeadTools = [
         lead_type_id?: string;
         refered_by?: string;
         campaign?: string;
-        assigned_to?: string;
         accountIDs?: string;
       },
       userId: string
@@ -386,7 +387,6 @@ export const crmLeadTools = [
           lead_type_id?: string;
           refered_by?: string;
           campaign?: string;
-          assigned_to?: string;
           accountIDs?: string;
         }>;
         segment_id?: string;
@@ -404,18 +404,28 @@ export const crmLeadTools = [
         if (!segment) notFound("Lead segment");
       }
 
-      const existing = await prismadb.crm_Leads.findMany({
-        where: {
-          assigned_to: userId,
-          deletedAt: null,
-          OR: [
-            ...args.leads.filter((lead) => lead.email).map((lead) => ({ email: lead.email })),
-            ...args.leads.filter((lead) => lead.company).map((lead) => ({ company: lead.company })),
-            ...args.leads.filter((lead) => lead.phone).map((lead) => ({ phone: lead.phone })),
-          ],
-        },
-        select: { id: true, email: true, company: true, phone: true },
-      });
+      const dedupeFilters = [
+        ...args.leads
+          .filter((lead) => lead.email)
+          .map((lead) => exactInsensitive("email", lead.email as string)),
+        ...args.leads
+          .filter((lead) => lead.company)
+          .map((lead) => exactInsensitive("company", lead.company as string)),
+        ...args.leads
+          .filter((lead) => lead.phone)
+          .map((lead) => exactInsensitive("phone", lead.phone as string)),
+      ];
+
+      const existing = dedupeFilters.length
+        ? await prismadb.crm_Leads.findMany({
+            where: {
+              assigned_to: userId,
+              deletedAt: null,
+              OR: dedupeFilters,
+            },
+            select: { id: true, email: true, company: true, phone: true },
+          })
+        : [];
       const existingKeys = new Set(
         existing.map((lead) => dedupeKeyForLead(lead, args.dedupe_keys))
       );
@@ -440,12 +450,12 @@ export const crmLeadTools = [
       const created = [];
       for (const candidate of candidates) {
         if (candidate.duplicate) continue;
-        const { accountIDs, assigned_to, ...leadData } = candidate.lead;
+        const { accountIDs, ...leadData } = candidate.lead;
         const lead = await prismadb.crm_Leads.create({
           data: {
             v: 0,
             ...leadData,
-            assigned_to: assigned_to ?? userId,
+            assigned_to: userId,
             accountsIDs: accountIDs,
             createdBy: userId,
             updatedBy: userId,

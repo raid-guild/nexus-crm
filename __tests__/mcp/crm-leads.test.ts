@@ -137,6 +137,26 @@ describe("crm lead MCP tools", () => {
     expect(mockPrisma.crm_Leads.update).not.toHaveBeenCalled();
   });
 
+  it("assigns created leads to the authenticated MCP user", async () => {
+    (mockPrisma.crm_Leads.create as jest.Mock).mockResolvedValue({
+      id: "lead-1",
+      assigned_to: "user-1",
+    });
+
+    await tool("crm_create_lead").handler(
+      { lastName: "Lead", email: "lead@example.com" },
+      "user-1",
+    );
+
+    expect(mockPrisma.crm_Leads.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        assigned_to: "user-1",
+        createdBy: "user-1",
+        updatedBy: "user-1",
+      }),
+    });
+  });
+
   it("dry-runs lead import with duplicate detection", async () => {
     (mockPrisma.crm_Leads.findMany as jest.Mock).mockResolvedValue([
       {
@@ -173,6 +193,44 @@ describe("crm lead MCP tools", () => {
       ],
     });
     expect(mockPrisma.crm_Leads.create).not.toHaveBeenCalled();
+  });
+
+  it("uses case-insensitive filters for import dedupe lookups", async () => {
+    (mockPrisma.crm_Leads.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: "existing-1",
+        email: "Same@Example.com",
+        company: "ACME Services",
+        phone: null,
+      },
+    ]);
+
+    await tool("crm_import_leads").handler(
+      {
+        leads: [
+          {
+            lastName: "One",
+            email: "same@example.com",
+            company: "acme services",
+          },
+        ],
+        dryRun: true,
+        dedupe_keys: ["email"],
+      },
+      "user-1",
+    );
+
+    expect(mockPrisma.crm_Leads.findMany).toHaveBeenCalledWith({
+      where: {
+        assigned_to: "user-1",
+        deletedAt: null,
+        OR: [
+          { email: { equals: "same@example.com", mode: "insensitive" } },
+          { company: { equals: "acme services", mode: "insensitive" } },
+        ],
+      },
+      select: { id: true, email: true, company: true, phone: true },
+    });
   });
 
   it("imports new leads and attaches them to a segment", async () => {
@@ -221,6 +279,28 @@ describe("crm lead MCP tools", () => {
       created: 2,
       duplicateCount: 0,
       createdLeadIds: ["lead-1", "lead-2"],
+    });
+  });
+
+  it("assigns imported leads to the authenticated MCP user", async () => {
+    (mockPrisma.crm_Leads.findMany as jest.Mock).mockResolvedValue([]);
+    (mockPrisma.crm_Leads.create as jest.Mock).mockResolvedValue({ id: "lead-1" });
+
+    await tool("crm_import_leads").handler(
+      {
+        leads: [{ lastName: "One", email: "one@example.com" }],
+        dryRun: false,
+        dedupe_keys: ["email"],
+      },
+      "user-1",
+    );
+
+    expect(mockPrisma.crm_Leads.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        assigned_to: "user-1",
+        createdBy: "user-1",
+        updatedBy: "user-1",
+      }),
     });
   });
 
