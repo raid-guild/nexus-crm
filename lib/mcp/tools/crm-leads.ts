@@ -63,13 +63,51 @@ export const crmLeadTools = [
   },
   {
     name: "crm_list_leads",
-    description: "List CRM leads assigned to the authenticated user",
-    schema: z.object({ ...paginationSchema }),
-    async handler(args: { limit: number; offset: number }, userId: string) {
-      const where = { assigned_to: userId, deletedAt: null };
+    description:
+      "List CRM leads assigned to the authenticated user. Optionally filter by segment, source, status, or type.",
+    schema: z.object({
+      ...paginationSchema,
+      segment_id: z.string().uuid().optional(),
+      lead_source_id: z.string().uuid().optional(),
+      lead_status_id: z.string().uuid().nullable().optional(),
+      lead_type_id: z.string().uuid().optional(),
+    }),
+    async handler(
+      args: {
+        limit: number;
+        offset: number;
+        segment_id?: string;
+        lead_source_id?: string;
+        lead_status_id?: string | null;
+        lead_type_id?: string;
+      },
+      userId: string
+    ) {
+      const where: any = {
+        assigned_to: userId,
+        deletedAt: null,
+        ...(args.lead_source_id ? { lead_source_id: args.lead_source_id } : {}),
+        ...(Object.prototype.hasOwnProperty.call(args, "lead_status_id")
+          ? { lead_status_id: args.lead_status_id }
+          : {}),
+        ...(args.lead_type_id ? { lead_type_id: args.lead_type_id } : {}),
+        ...(args.segment_id
+          ? { segments: { some: { segment_id: args.segment_id } } }
+          : {}),
+      };
       const [data, total] = await Promise.all([
         prismadb.crm_Leads.findMany({
           where,
+          include: {
+            lead_source: { select: { id: true, name: true } },
+            lead_status: { select: { id: true, name: true } },
+            lead_type: { select: { id: true, name: true } },
+            segments: {
+              include: {
+                segment: { select: { id: true, name: true } },
+              },
+            },
+          },
           ...paginationArgs(args),
           orderBy: { createdAt: "desc" },
         }),
