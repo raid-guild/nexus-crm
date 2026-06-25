@@ -8,9 +8,59 @@ import {
   ilike,
   notFound,
   softDeleteData,
+  validationError,
 } from "../helpers";
 
+const PREFERRED_LEAD_STATUS_ORDER = [
+  "New",
+  "Researching",
+  "Cold Outreach",
+  "Contacted",
+  "Follow Up",
+  "Qualified",
+  "Converted to Opportunity",
+  "Nurture",
+  "Lost",
+];
+
+function normalizeName(name: string) {
+  return name.trim().toLowerCase();
+}
+
+function sortLeadStatuses<T extends { name: string }>(statuses: T[]): T[] {
+  const order = new Map(
+    PREFERRED_LEAD_STATUS_ORDER.map((name, index) => [
+      normalizeName(name),
+      index,
+    ])
+  );
+
+  return [...statuses].sort((a, b) => {
+    const aOrder = order.get(normalizeName(a.name));
+    const bOrder = order.get(normalizeName(b.name));
+
+    if (aOrder !== undefined && bOrder !== undefined) return aOrder - bOrder;
+    if (aOrder !== undefined) return -1;
+    if (bOrder !== undefined) return 1;
+
+    return a.name.localeCompare(b.name);
+  });
+}
+
 export const crmLeadTools = [
+  {
+    name: "crm_list_lead_statuses",
+    description:
+      "List available CRM lead statuses for moving leads across the Kanban board",
+    schema: z.object({}),
+    async handler(_args: Record<string, never>) {
+      const statuses = await prismadb.crm_Lead_Statuses.findMany({
+        select: { id: true, name: true },
+      });
+
+      return listResponse(sortLeadStatuses(statuses), statuses.length, 0);
+    },
+  },
   {
     name: "crm_list_leads",
     description: "List CRM leads assigned to the authenticated user",
@@ -131,6 +181,69 @@ export const crmLeadTools = [
         where: { id },
         data: { ...updateData, updatedBy: userId },
       });
+      return itemResponse(lead);
+    },
+  },
+  {
+    name: "crm_update_lead_status",
+    description:
+      "Move one of the authenticated user's leads to a lead status by ID or exact status name. Pass lead_status_id null to clear the status.",
+    schema: z.object({
+      id: z.string().uuid(),
+      lead_status_id: z.string().uuid().nullable().optional(),
+      lead_status_name: z.string().min(1).optional(),
+    }),
+    async handler(
+      args: {
+        id: string;
+        lead_status_id?: string | null;
+        lead_status_name?: string;
+      },
+      userId: string
+    ) {
+      const existing = await prismadb.crm_Leads.findFirst({
+        where: { id: args.id, assigned_to: userId, deletedAt: null },
+      });
+      if (!existing) notFound("Lead");
+
+      const hasStatusId = Object.prototype.hasOwnProperty.call(
+        args,
+        "lead_status_id"
+      );
+      const hasStatusName = Boolean(args.lead_status_name?.trim());
+      if (hasStatusId && hasStatusName) {
+        validationError("Provide either lead_status_id or lead_status_name, not both");
+      }
+      if (!hasStatusId && !hasStatusName) {
+        validationError("Provide lead_status_id, lead_status_name, or lead_status_id null");
+      }
+
+      let nextStatusId: string | null = args.lead_status_id ?? null;
+
+      if (hasStatusName) {
+        const statusName = args.lead_status_name?.trim();
+        const status = await prismadb.crm_Lead_Statuses.findFirst({
+          where: { name: { equals: statusName, mode: "insensitive" } },
+          select: { id: true },
+        });
+        if (!status) notFound("Lead status");
+        nextStatusId = status.id;
+      } else if (nextStatusId) {
+        const status = await prismadb.crm_Lead_Statuses.findUnique({
+          where: { id: nextStatusId },
+          select: { id: true },
+        });
+        if (!status) notFound("Lead status");
+      }
+
+      const lead = await prismadb.crm_Leads.update({
+        where: { id: args.id },
+        data: { lead_status_id: nextStatusId, updatedBy: userId },
+        include: {
+          lead_status: { select: { id: true, name: true } },
+        },
+      });
+
       return itemResponse(lead);
     },
   },
