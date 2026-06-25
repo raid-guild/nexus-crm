@@ -3,6 +3,7 @@ import { prismadb } from "@/lib/prisma";
 import {
   paginationSchema,
   paginationArgs,
+  conflict,
   listResponse,
   itemResponse,
   ilike,
@@ -47,7 +48,55 @@ function sortLeadStatuses<T extends { name: string }>(statuses: T[]): T[] {
   });
 }
 
+const leadFieldSchema = {
+  firstName: z.string().min(1).optional(),
+  lastName: z.string().min(1).optional(),
+  email: z.string().email().optional(),
+  company: z.string().optional(),
+  phone: z.string().optional(),
+  jobTitle: z.string().optional(),
+  description: z.string().optional(),
+  lead_source_id: z.string().uuid().optional(),
+  lead_status_id: z.string().uuid().nullable().optional(),
+  lead_type_id: z.string().uuid().optional(),
+  refered_by: z.string().optional(),
+  campaign: z.string().optional(),
+  assigned_to: z.string().uuid().optional(),
+  accountIDs: z.string().uuid().optional(),
+};
+
+async function listConfigValues(model: {
+  findMany: (args: { select: { id: true; name: true }; orderBy: { name: "asc" } }) => Promise<{ id: string; name: string }[]>;
+}) {
+  const values = await model.findMany({
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+  return listResponse(values, values.length, 0);
+}
+
+function dedupeKeyForLead(
+  lead: { email?: string | null; company?: string | null; phone?: string | null },
+  keys: string[]
+) {
+  return keys
+    .map((key) => {
+      const value = lead[key as keyof typeof lead];
+      return value ? `${key}:${value.trim().toLowerCase()}` : null;
+    })
+    .filter(Boolean)
+    .join("|");
+}
+
 export const crmLeadTools = [
+  {
+    name: "crm_list_lead_sources",
+    description: "List available CRM lead sources",
+    schema: z.object({}),
+    async handler() {
+      return listConfigValues(prismadb.crm_Lead_Sources);
+    },
+  },
   {
     name: "crm_list_lead_statuses",
     description:
@@ -59,6 +108,14 @@ export const crmLeadTools = [
       });
 
       return listResponse(sortLeadStatuses(statuses), statuses.length, 0);
+    },
+  },
+  {
+    name: "crm_list_lead_types",
+    description: "List available CRM lead types",
+    schema: z.object({}),
+    async handler() {
+      return listConfigValues(prismadb.crm_Lead_Types);
     },
   },
   {
@@ -161,12 +218,8 @@ export const crmLeadTools = [
     name: "crm_create_lead",
     description: "Create a new CRM lead",
     schema: z.object({
-      firstName: z.string().min(1).optional(),
+      ...leadFieldSchema,
       lastName: z.string().min(1),
-      email: z.string().email().optional(),
-      company: z.string().optional(),
-      phone: z.string().optional(),
-      jobTitle: z.string().optional(),
     }),
     async handler(
       args: {
@@ -176,12 +229,28 @@ export const crmLeadTools = [
         company?: string;
         phone?: string;
         jobTitle?: string;
+        description?: string;
+        lead_source_id?: string;
+        lead_status_id?: string | null;
+        lead_type_id?: string;
+        refered_by?: string;
+        campaign?: string;
+        assigned_to?: string;
+        accountIDs?: string;
       },
       userId: string
     ) {
-      const { lastName, ...rest } = args;
+      const { lastName, accountIDs, assigned_to, ...rest } = args;
       const lead = await prismadb.crm_Leads.create({
-        data: { v: 0, lastName, ...rest, assigned_to: userId, createdBy: userId },
+        data: {
+          v: 0,
+          lastName,
+          ...rest,
+          assigned_to: assigned_to ?? userId,
+          accountsIDs: accountIDs,
+          createdBy: userId,
+          updatedBy: userId,
+        },
       });
       return itemResponse(lead);
     },
@@ -191,12 +260,7 @@ export const crmLeadTools = [
     description: "Update an existing CRM lead by ID",
     schema: z.object({
       id: z.string().uuid(),
-      firstName: z.string().min(1).optional(),
-      lastName: z.string().min(1).optional(),
-      email: z.string().email().optional(),
-      company: z.string().optional(),
-      phone: z.string().optional(),
-      jobTitle: z.string().optional(),
+      ...leadFieldSchema,
     }),
     async handler(
       args: {
@@ -207,6 +271,14 @@ export const crmLeadTools = [
         company?: string;
         phone?: string;
         jobTitle?: string;
+        description?: string;
+        lead_source_id?: string;
+        lead_status_id?: string | null;
+        lead_type_id?: string;
+        refered_by?: string;
+        campaign?: string;
+        assigned_to?: string;
+        accountIDs?: string;
       },
       userId: string
     ) {
@@ -214,10 +286,10 @@ export const crmLeadTools = [
         where: { id: args.id, assigned_to: userId, deletedAt: null },
       });
       if (!existing) notFound("Lead");
-      const { id, ...updateData } = args;
+      const { id, accountIDs, ...updateData } = args;
       const lead = await prismadb.crm_Leads.update({
         where: { id },
-        data: { ...updateData, updatedBy: userId },
+        data: { ...updateData, accountsIDs: accountIDs, updatedBy: userId },
       });
       return itemResponse(lead);
     },
@@ -283,6 +355,224 @@ export const crmLeadTools = [
       });
 
       return itemResponse(lead);
+    },
+  },
+  {
+    name: "crm_import_leads",
+    description:
+      "Bulk import assigned leads with optional dry-run, dedupe checks, segment membership, and source/status/type fields.",
+    schema: z.object({
+      leads: z.array(z.object({
+        ...leadFieldSchema,
+        lastName: z.string().min(1),
+      })).min(1).max(500),
+      segment_id: z.string().uuid().optional(),
+      import_batch_id: z.string().uuid().optional(),
+      dryRun: z.boolean().default(false),
+      dedupe_keys: z.array(z.enum(["email", "company", "phone"])).default(["email"]),
+    }),
+    async handler(
+      args: {
+        leads: Array<{
+          firstName?: string;
+          lastName: string;
+          email?: string;
+          company?: string;
+          phone?: string;
+          jobTitle?: string;
+          description?: string;
+          lead_source_id?: string;
+          lead_status_id?: string | null;
+          lead_type_id?: string;
+          refered_by?: string;
+          campaign?: string;
+          assigned_to?: string;
+          accountIDs?: string;
+        }>;
+        segment_id?: string;
+        import_batch_id?: string;
+        dryRun: boolean;
+        dedupe_keys: Array<"email" | "company" | "phone">;
+      },
+      userId: string
+    ) {
+      if (args.segment_id) {
+        const segment = await prismadb.crm_Lead_Segments.findFirst({
+          where: { id: args.segment_id, createdBy: userId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!segment) notFound("Lead segment");
+      }
+
+      const existing = await prismadb.crm_Leads.findMany({
+        where: {
+          assigned_to: userId,
+          deletedAt: null,
+          OR: [
+            ...args.leads.filter((lead) => lead.email).map((lead) => ({ email: lead.email })),
+            ...args.leads.filter((lead) => lead.company).map((lead) => ({ company: lead.company })),
+            ...args.leads.filter((lead) => lead.phone).map((lead) => ({ phone: lead.phone })),
+          ],
+        },
+        select: { id: true, email: true, company: true, phone: true },
+      });
+      const existingKeys = new Set(
+        existing.map((lead) => dedupeKeyForLead(lead, args.dedupe_keys))
+      );
+
+      const seenImportKeys = new Set<string>();
+      const candidates = args.leads.map((lead, index) => {
+        const key = dedupeKeyForLead(lead, args.dedupe_keys);
+        const duplicate = Boolean(key && (existingKeys.has(key) || seenImportKeys.has(key)));
+        if (key) seenImportKeys.add(key);
+        return { index, lead, key, duplicate };
+      });
+
+      if (args.dryRun) {
+        return itemResponse({
+          dryRun: true,
+          requested: args.leads.length,
+          wouldCreate: candidates.filter((candidate) => !candidate.duplicate).length,
+          duplicates: candidates.filter((candidate) => candidate.duplicate),
+        });
+      }
+
+      const created = [];
+      for (const candidate of candidates) {
+        if (candidate.duplicate) continue;
+        const { accountIDs, assigned_to, ...leadData } = candidate.lead;
+        const lead = await prismadb.crm_Leads.create({
+          data: {
+            v: 0,
+            ...leadData,
+            assigned_to: assigned_to ?? userId,
+            accountsIDs: accountIDs,
+            createdBy: userId,
+            updatedBy: userId,
+          },
+        });
+        created.push(lead);
+      }
+
+      if (args.segment_id && created.length > 0) {
+        await prismadb.crm_LeadSegmentMembers.createMany({
+          data: created.map((lead) => ({
+            lead_id: lead.id,
+            segment_id: args.segment_id as string,
+            import_batch_id: args.import_batch_id,
+            status: "imported",
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      return itemResponse({
+        requested: args.leads.length,
+        created: created.length,
+        duplicateCount: candidates.filter((candidate) => candidate.duplicate).length,
+        createdLeadIds: created.map((lead) => lead.id),
+      });
+    },
+  },
+  {
+    name: "crm_convert_lead_to_opportunity",
+    description:
+      "Convert one of the authenticated user's assigned leads into an opportunity and store conversion traceability on the lead.",
+    schema: z.object({
+      id: z.string().uuid(),
+      opportunity_name: z.string().min(1).optional(),
+      description: z.string().optional(),
+      next_step: z.string().optional(),
+      budget: z.number().min(0).optional(),
+      expected_revenue: z.number().min(0).optional(),
+      currency: z.string().optional(),
+      close_date: z.string().datetime().optional(),
+      sales_stage: z.string().uuid().optional(),
+      type: z.string().uuid().optional(),
+    }),
+    async handler(
+      args: {
+        id: string;
+        opportunity_name?: string;
+        description?: string;
+        next_step?: string;
+        budget?: number;
+        expected_revenue?: number;
+        currency?: string;
+        close_date?: string;
+        sales_stage?: string;
+        type?: string;
+      },
+      userId: string
+    ) {
+      const lead = await prismadb.crm_Leads.findFirst({
+        where: { id: args.id, assigned_to: userId, deletedAt: null },
+      });
+      if (!lead) notFound("Lead");
+      if (lead.converted_opportunity_id) {
+        conflict("Lead has already been converted to an opportunity");
+      }
+
+      const status = await prismadb.crm_Lead_Statuses.findFirst({
+        where: { name: { equals: "Converted to Opportunity", mode: "insensitive" } },
+        select: { id: true },
+      });
+
+      const opportunity = await prismadb.crm_Opportunities.create({
+        data: {
+          v: 0,
+          name:
+            args.opportunity_name ??
+            lead.company ??
+            [lead.firstName, lead.lastName].filter(Boolean).join(" "),
+          description: args.description ?? lead.description ?? undefined,
+          next_step: args.next_step,
+          budget: args.budget,
+          expected_revenue: args.expected_revenue,
+          currency: args.currency,
+          close_date: args.close_date ? new Date(args.close_date) : undefined,
+          sales_stage: args.sales_stage,
+          type: args.type,
+          account: lead.accountsIDs,
+          assigned_to: userId,
+          createdBy: userId,
+          updatedBy: userId,
+          last_activity_by: userId,
+          status: "ACTIVE",
+        },
+      });
+
+      const updatedLead = await prismadb.crm_Leads.update({
+        where: { id: lead.id },
+        data: {
+          converted_opportunity_id: opportunity.id,
+          lead_status_id: status?.id ?? lead.lead_status_id,
+          updatedBy: userId,
+        },
+      });
+
+      await prismadb.crm_AuditLog.createMany({
+        data: [
+          {
+            entityType: "opportunity",
+            entityId: opportunity.id,
+            action: "created",
+            userId,
+            changes: { convertedFromLeadId: lead.id },
+          },
+          {
+            entityType: "lead",
+            entityId: lead.id,
+            action: "updated",
+            userId,
+            changes: {
+              converted_opportunity_id: { old: null, new: opportunity.id },
+            },
+          },
+        ],
+      });
+
+      return itemResponse({ lead: updatedLead, opportunity });
     },
   },
   {
