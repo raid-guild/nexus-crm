@@ -87,9 +87,11 @@ model crm_Leads {
   lead_source_id  String?            @db.Uuid
   lead_status_id  String?            @db.Uuid
   lead_type_id    String?            @db.Uuid
+  converted_opportunity_id String?            @db.Uuid
   lead_source     crm_Lead_Sources?  @relation("lead_source_relation", fields: [lead_source_id], references: [id])
   lead_status     crm_Lead_Statuses? @relation("lead_status_relation", fields: [lead_status_id], references: [id])
   lead_type       crm_Lead_Types?    @relation("lead_type_relation", fields: [lead_type_id], references: [id])
+  converted_opportunity crm_Opportunities? @relation("LeadConvertedOpportunity", fields: [converted_opportunity_id], references: [id], onDelete: SetNull)
   refered_by        String?
   campaign          String?
   assigned_to       String?            @db.Uuid
@@ -97,6 +99,7 @@ model crm_Leads {
   accountsIDs       String?            @db.Uuid
   assigned_accounts crm_Accounts?      @relation(fields: [accountsIDs], references: [id])
   documents         DocumentsToLeads[]
+  segments          crm_LeadSegmentMembers[]
   embedding         crm_Embeddings_Leads?
   deletedAt         DateTime?
   deletedBy         String?   @db.Uuid
@@ -108,8 +111,54 @@ model crm_Leads {
   @@index([lead_source_id])
   @@index([lead_status_id])
   @@index([lead_type_id])
+  @@index([converted_opportunity_id])
   @@index([createdAt])
   @@index([deletedAt])
+}
+
+model crm_Lead_Segments {
+  id          String    @id @default(uuid()) @db.Uuid
+  v           Int       @default(0) @map("__v")
+  name        String
+  description String?
+  audience    String?
+  region      String?
+  source      String?
+  criteria    Json?     @db.JsonB
+  createdBy   String?   @db.Uuid
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime? @updatedAt
+  deletedAt   DateTime?
+  deletedBy   String?   @db.Uuid
+
+  created_by_user Users?                   @relation("LeadSegmentCreatedBy", fields: [createdBy], references: [id])
+  members         crm_LeadSegmentMembers[]
+
+  @@unique([name, createdBy])
+  @@index([createdBy])
+  @@index([name])
+  @@index([source])
+  @@index([region])
+  @@index([createdAt])
+  @@index([deletedAt])
+}
+
+model crm_LeadSegmentMembers {
+  lead_id         String    @db.Uuid
+  segment_id      String    @db.Uuid
+  import_batch_id String?   @db.Uuid
+  status          String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime? @updatedAt
+
+  lead    crm_Leads         @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+  segment crm_Lead_Segments @relation(fields: [segment_id], references: [id], onDelete: Cascade)
+
+  @@id([lead_id, segment_id])
+  @@index([lead_id])
+  @@index([segment_id])
+  @@index([import_batch_id])
+  @@index([status])
 }
 
 model crm_Contact_Enrichment {
@@ -230,6 +279,7 @@ model crm_Opportunities {
   contacts             ContactsToOpportunities[]
   embedding            crm_Embeddings_Opportunities?
   lineItems            crm_OpportunityLineItems[]
+  converted_leads      crm_Leads[]                     @relation("LeadConvertedOpportunity")
   deletedAt            DateTime?
   deletedBy            String?   @db.Uuid
 
@@ -953,6 +1003,7 @@ model Users {
   crm_accounts_tasks   crm_Accounts_Tasks[]
   accounts             crm_Accounts[]        @relation("AccountAssignedTo")
   leads                crm_Leads[]           @relation("LeadAssignedTo")
+  created_lead_segments crm_Lead_Segments[]  @relation("LeadSegmentCreatedBy")
   created_by_user      crm_Opportunities[]   @relation("created_by_user_relation")
   assigned_opportunity crm_Opportunities[]   @relation("assigned_to_user_relation")
   assigned_contacts    crm_Contacts[]        @relation("assigned_contacts")
