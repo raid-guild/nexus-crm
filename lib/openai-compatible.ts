@@ -14,7 +14,7 @@ export function getOpenAICompatibleApiKey(): string | undefined {
   const baseURL = env("OPENAI_BASE_URL") ?? env("OPENAI_COMPATIBLE_BASE_URL");
 
   if (provider === "venice" || baseURL?.includes("venice.ai")) {
-    return env("VENICE_API_KEY");
+    return env("VENICE_API_KEY") ?? env("OPENAI_API_KEY") ?? env("OPEN_AI_API_KEY");
   }
 
   return env("OPENAI_API_KEY") ?? env("OPEN_AI_API_KEY") ?? env("VENICE_API_KEY");

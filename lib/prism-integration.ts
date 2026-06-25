@@ -28,11 +28,17 @@ function trimBaseURL(value: string | undefined): string | undefined {
   return value?.replace(/\/+$/, "");
 }
 
+function endpointError(response: Response, body: string): Error {
+  const bodyDetail = body ? `, response body ${body.length} bytes` : "";
+  return new Error(`HTTP ${response.status} ${response.statusText || "error"}${bodyDetail}`);
+}
+
 export function getPrismIntegrationConfig() {
   return {
     agentBaseURL: trimBaseURL(env("PRISM_AGENT_API_BASE_URL")),
     agentServiceToken: env("PRISM_AGENT_SERVICE_TOKEN"),
     hookKey: env("PRISM_DOCUMENT_HOOK_KEY") ?? "crm-document-uploaded",
+    documentAiModel: env("DOCUMENT_AI_MODEL"),
     memoryBaseURL: trimBaseURL(env("PRISM_MEMORY_BASE_URL") ?? env("PRISM_API_BASE")),
     memoryApiKey: env("PRISM_API_KEY") ?? env("PRISM_API_WRITE_KEY"),
     codexRuntimeURL: trimBaseURL(env("PRISM_CODEX_RUNTIME_URL")),
@@ -71,7 +77,7 @@ async function postJson(url: string, headers: HeadersInit, body: unknown) {
   }
 
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${text || response.statusText}`);
+    throw endpointError(response, text);
   }
 
   return data;
@@ -99,6 +105,7 @@ async function sendToPrismMemory(payload: PrismHandoffPayload) {
         contentHash: payload.contentHash,
         summary: payload.summary,
         systemType: payload.systemType,
+        documentAiModel: config.documentAiModel,
       },
     },
   );
@@ -123,6 +130,10 @@ async function triggerPrismDocumentHook(payload: PrismHandoffPayload) {
         summary: payload.summary,
         systemType: payload.systemType,
       },
+      documentAi: {
+        provider: "prism",
+        model: config.documentAiModel,
+      },
       contentText: payload.contentText,
     },
   );
@@ -140,6 +151,11 @@ export async function handoffDocumentToPrism(
     sendToPrismMemory(payload),
     triggerPrismDocumentHook(payload),
   ]);
+
+  const memoryConfigured = isPrismMemoryConfigured();
+  const hookConfigured = isPrismAgentConfigured();
+  const memoryAccepted = memoryConfigured && memoryResult.status === "fulfilled";
+  const hookAccepted = hookConfigured && hookResult.status === "fulfilled";
 
   if (memoryResult.status === "fulfilled" && memoryResult.value) {
     result.memoryInboxId =
@@ -161,14 +177,14 @@ export async function handoffDocumentToPrism(
     result.errors.push(`hook: ${hookResult.reason?.message ?? hookResult.reason}`);
   }
 
-  const sent = Boolean(
+  const sent = memoryAccepted || hookAccepted || Boolean(
     result.memoryInboxId ||
       result.memoryInboxUrl ||
       result.hookRunId ||
       result.hookRequestId ||
       result.hookArtifactId,
   );
-  const configured = isPrismAgentConfigured() || isPrismMemoryConfigured();
+  const configured = hookConfigured || memoryConfigured;
 
   result.status = sent
     ? result.errors.length

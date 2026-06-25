@@ -21,7 +21,7 @@ const DashboardPage = async () => {
 
   if (!session) return null;
 
-  const userId = session?.user?.id;
+  const userId = session.user.id;
 
   //Fetch translations from dictionary
   const dict = await getTranslations("DashboardPage");
