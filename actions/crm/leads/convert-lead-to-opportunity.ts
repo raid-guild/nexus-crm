@@ -91,7 +91,10 @@ export const convertLeadToOpportunity = async (data: { leadId: string }) => {
     });
 
     if (result.error) return { error: result.error };
-    if (!result.data.alreadyConverted) {
+    const conversion = result.data;
+    if (!conversion) return { error: "Failed to convert lead" };
+
+    if (!conversion.alreadyConverted) {
       await writeAuditLog({
         entityType: "lead",
         entityId: data.leadId,
@@ -100,14 +103,14 @@ export const convertLeadToOpportunity = async (data: { leadId: string }) => {
           {
             field: "converted_opportunity_id",
             old: null,
-            new: result.data.opportunityId,
+            new: conversion.opportunityId,
           },
         ],
         userId: user.id,
       });
       void inngest.send({
         name: "crm/opportunity.saved",
-        data: { record_id: result.data.opportunityId },
+        data: { record_id: conversion.opportunityId },
       });
       void inngest.send({
         name: "crm/lead.saved",
