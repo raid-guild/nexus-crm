@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ColumnDef } from "@tanstack/react-table";
 
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 
 import { Lead } from "../table-data/schema";
 import { DataTableColumnHeader } from "./data-table-column-header";
@@ -26,7 +27,30 @@ export const createColumns = (
   leadSources: ConfigItem[],
   leadStatuses: ConfigItem[],
   leadTypes: ConfigItem[],
+  leadSegments: ConfigItem[],
 ): ColumnDef<Lead>[] => [
+  {
+    id: "select",
+    header: ({ table }) => (
+      <Checkbox
+        checked={
+          table.getIsAllPageRowsSelected() ||
+          (table.getIsSomePageRowsSelected() && "indeterminate")
+        }
+        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        aria-label="Select all"
+      />
+    ),
+    cell: ({ row }) => (
+      <Checkbox
+        checked={row.getIsSelected()}
+        onCheckedChange={(value) => row.toggleSelected(!!value)}
+        aria-label="Select row"
+      />
+    ),
+    enableSorting: false,
+    enableHiding: false,
+  },
   {
     accessorKey: "createdAt",
     header: ({ column }) => (
@@ -228,6 +252,7 @@ export const createColumns = (
         leadSources={leadSources}
         leadStatuses={leadStatuses}
         leadTypes={leadTypes}
+        leadSegments={leadSegments}
       />
     ),
   },

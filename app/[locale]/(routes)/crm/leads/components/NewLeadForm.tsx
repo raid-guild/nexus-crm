@@ -26,6 +26,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { UserSearchCombobox } from "@/components/ui/user-search-combobox";
 import { createLead } from "@/actions/crm/leads/create-lead";
+import { LeadSegmentPicker } from "./LeadSegmentPicker";
 
 //TODO: fix all the types
 type ConfigItem = { id: string; name: string };
@@ -35,10 +36,11 @@ type NewTaskFormProps = {
   leadSources: ConfigItem[];
   leadStatuses: ConfigItem[];
   leadTypes: ConfigItem[];
+  leadSegments: ConfigItem[];
   onFinish?: () => void;
 };
 
-export function NewLeadForm({ accounts, leadSources, leadStatuses, leadTypes, onFinish }: NewTaskFormProps) {
+export function NewLeadForm({ accounts, leadSources, leadStatuses, leadTypes, leadSegments, onFinish }: NewTaskFormProps) {
   const t = useTranslations("CrmLeadForm");
   const c = useTranslations("Common");
 
@@ -57,6 +59,7 @@ export function NewLeadForm({ accounts, leadSources, leadStatuses, leadTypes, on
     campaign: z.string().optional(),
     assigned_to: z.string().optional(),
     accountIDs: z.string().optional(),
+    segment_ids: z.array(z.string()).optional(),
   });
 
   type NewLeadFormValues = z.infer<typeof formSchema>;
@@ -79,6 +82,7 @@ export function NewLeadForm({ accounts, leadSources, leadStatuses, leadTypes, on
       campaign: "",
       assigned_to: "",
       accountIDs: "",
+      segment_ids: [],
     },
   });
 
@@ -360,6 +364,24 @@ export function NewLeadForm({ accounts, leadSources, leadStatuses, leadTypes, on
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="segment_ids"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Segments</FormLabel>
+                  <FormControl>
+                    <LeadSegmentPicker
+                      value={field.value ?? []}
+                      segments={leadSegments}
+                      disabled={form.formState.isSubmitting}
+                      onChange={field.onChange}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

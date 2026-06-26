@@ -31,6 +31,7 @@ import { LucideLandmark } from "lucide-react";
 import { LeadDetailActions } from "./LeadDetailActions";
 import { getAllCrmData } from "@/actions/crm/get-crm-data";
 import { Badge } from "@/components/ui/badge";
+import { getLeadSegments } from "@/actions/crm/leads/segments";
 
 interface OppsViewProps {
   data: any;
@@ -43,6 +44,7 @@ export async function BasicView({ data }: OppsViewProps) {
       select: { id: true, name: true },
     });
   const crmData = await getAllCrmData();
+  const leadSegments = await getLeadSegments();
   const { leadSources, leadStatuses, leadTypes } = crmData;
   if (!data) return <div>Opportunity not found</div>;
   return (
@@ -62,6 +64,7 @@ export async function BasicView({ data }: OppsViewProps) {
               leadSources={leadSources}
               leadStatuses={leadStatuses}
               leadTypes={leadTypes}
+              leadSegments={leadSegments}
             />
           </div>
         </CardHeader>
@@ -197,6 +200,26 @@ export async function BasicView({ data }: OppsViewProps) {
                 <div className="space-y-1">
                   <p className="text-sm font-medium leading-none">Status</p>
                   <p className="text-sm text-muted-foreground">{data.lead_status?.name ?? "—"}</p>
+                </div>
+              </div>
+              <div className="-mx-2 flex items-start space-x-4 rounded-md p-2 transition-all hover:bg-accent hover:text-accent-foreground">
+                <Combine className="mt-px h-5 w-5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium leading-none">
+                    Converted opportunity
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {data.converted_opportunity ? (
+                      <Link
+                        href={`/crm/opportunities/${data.converted_opportunity.id}`}
+                        className="hover:underline"
+                      >
+                        {data.converted_opportunity.name ?? data.converted_opportunity.id}
+                      </Link>
+                    ) : (
+                      "—"
+                    )}
+                  </p>
                 </div>
               </div>
               <div className="-mx-2 flex items-start space-x-4 rounded-md p-2 transition-all hover:bg-accent hover:text-accent-foreground">

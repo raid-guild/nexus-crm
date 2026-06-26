@@ -35,9 +35,10 @@ type CrmData = Awaited<ReturnType<typeof getAllCrmData>>;
 interface LeadsViewProps {
   data: any[];
   crmData: CrmData;
+  leadSegments: { id: string; name: string }[];
 }
 
-const LeadsView = ({ data, crmData }: LeadsViewProps) => {
+const LeadsView = ({ data, crmData, leadSegments }: LeadsViewProps) => {
   const { accounts, leadSources, leadStatuses, leadTypes } = crmData;
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -113,6 +114,7 @@ const LeadsView = ({ data, crmData }: LeadsViewProps) => {
                     leadSources={leadSources}
                     leadStatuses={leadStatuses}
                     leadTypes={leadTypes}
+                    leadSegments={leadSegments}
                     onFinish={() => setOpen(false)}
                   />
                 </div>
@@ -138,6 +140,7 @@ const LeadsView = ({ data, crmData }: LeadsViewProps) => {
               leadSources={leadSources}
               leadStatuses={leadStatuses}
               leadTypes={leadTypes}
+              leadSegments={leadSegments}
             />
           ))}
       </CardContent>
