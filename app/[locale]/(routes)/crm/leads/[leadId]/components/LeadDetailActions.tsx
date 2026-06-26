@@ -46,17 +46,23 @@ export function LeadDetailActions({
     setIsConverting(true);
     try {
       const result = await convertLeadToOpportunity({ leadId: lead.id });
-      if (result?.error) {
+      if ("error" in result) {
         toast.error(result.error);
         return;
       }
 
+      const conversion = result.data;
+      if (!conversion) {
+        toast.error("Failed to convert lead");
+        return;
+      }
+
       toast.success(
-        result.data.alreadyConverted
+        conversion.alreadyConverted
           ? "Lead already converted"
           : "Lead converted to opportunity"
       );
-      router.push(`/crm/opportunities/${result.data.opportunityId}`);
+      router.push(`/crm/opportunities/${conversion.opportunityId}`);
       router.refresh();
     } finally {
       setIsConverting(false);

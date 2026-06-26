@@ -131,7 +131,7 @@ const LeadsView = ({ data, crmData, leadSegments = [] }: LeadsViewProps) => {
           ) : view === "board" ? (
             <LeadKanbanBoard
               data={data}
-              crmData={{ leadSources, leadStatuses, leadTypes }}
+              crmData={{ leadSources, leadStatuses, leadTypes, leadSegments }}
             />
           ) : (
             <LeadDataTable
