@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import sendEmail from "@/lib/sendmail";
 import { inngest } from "@/inngest/client";
 import { writeAuditLog } from "@/lib/audit-log";
+import { setLeadSegmentsForUser } from "@/lib/crm/lead-segments";
+import { mapLegacyRole } from "@/lib/authz";
 
 export const createLead = async (data: {
   first_name?: string;
@@ -21,6 +23,7 @@ export const createLead = async (data: {
   campaign?: string;
   assigned_to?: string;
   accountIDs?: string;
+  segment_ids?: string[];
 }) => {
   const session = await getSession();
   if (!session) return { error: "Unauthorized" };
@@ -41,9 +44,16 @@ export const createLead = async (data: {
     campaign,
     assigned_to,
     accountIDs,
+    segment_ids,
   } = data;
 
   try {
+    const currentUser = await prismadb.users.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (!currentUser) return { error: "Unauthorized" };
+
     const lead = await prismadb.crm_Leads.create({
       data: {
         v: 1,
@@ -65,6 +75,14 @@ export const createLead = async (data: {
         accountsIDs: accountIDs || undefined,
       },
     });
+
+    if (segment_ids !== undefined) {
+      await setLeadSegmentsForUser(
+        { id: userId, role: mapLegacyRole(currentUser.role) },
+        lead.id,
+        segment_ids
+      );
+    }
 
     if (assigned_to && assigned_to !== userId) {
       const notifyRecipient = await prismadb.users.findFirst({

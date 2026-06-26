@@ -28,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { UserSearchCombobox } from "@/components/ui/user-search-combobox";
 import { AccountSearchCombobox } from "@/components/ui/account-search-combobox";
 import { updateLead } from "@/actions/crm/leads/update-lead";
+import { LeadSegmentPicker } from "./LeadSegmentPicker";
 
 //TODO: fix all the types
 type ConfigItem = { id: string; name: string };
@@ -38,11 +39,13 @@ type NewTaskFormProps = {
   leadSources: ConfigItem[];
   leadStatuses: ConfigItem[];
   leadTypes: ConfigItem[];
+  leadSegments: ConfigItem[];
 };
 
-export function UpdateLeadForm({ initialData, setOpen, leadSources, leadStatuses, leadTypes }: NewTaskFormProps) {
+export function UpdateLeadForm({ initialData, setOpen, leadSources, leadStatuses, leadTypes, leadSegments }: NewTaskFormProps) {
   const t = useTranslations("CrmLeadForm");
   const c = useTranslations("Common");
+  const manageableSegmentIds = new Set(leadSegments.map((segment) => segment.id));
 
   const formSchema = z.object({
     id: z.uuid(),
@@ -61,6 +64,7 @@ export function UpdateLeadForm({ initialData, setOpen, leadSources, leadStatuses
     campaign: z.string().optional().nullable(),
     assigned_to: z.string().optional().nullable(),
     accountsIDs: z.string().optional().nullable(),
+    segment_ids: z.array(z.string()).optional(),
   });
 
   type NewLeadFormValues = z.infer<typeof formSchema>;
@@ -74,6 +78,12 @@ export function UpdateLeadForm({ initialData, setOpen, leadSources, leadStatuses
       lead_source_id: initialData.lead_source_id ?? "",
       lead_status_id: initialData.lead_status_id ?? "",
       lead_type_id: initialData.lead_type_id ?? "",
+      segment_ids:
+        initialData.segments
+          ?.map((member: any) => member.segment?.id ?? member.segment_id)
+          .filter((segmentId: string | undefined) =>
+            Boolean(segmentId && manageableSegmentIds.has(segmentId))
+          ) ?? [],
     },
   });
 
@@ -85,6 +95,7 @@ export function UpdateLeadForm({ initialData, setOpen, leadSources, leadStatuses
       lead_type_id: data.lead_type_id ?? undefined,
       assigned_to: data.assigned_to ?? undefined,
       accountIDs: data.accountsIDs ?? undefined,
+      segment_ids: data.segment_ids ?? [],
     });
     if (result?.error) {
       form.setError("root.serverError", { message: result.error });
@@ -353,6 +364,24 @@ export function UpdateLeadForm({ initialData, setOpen, leadSources, leadStatuses
                       onChange={field.onChange}
                       placeholder={t("assignAccountPlaceholder")}
                       disabled={form.formState.isSubmitting}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="segment_ids"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Segments</FormLabel>
+                  <FormControl>
+                    <LeadSegmentPicker
+                      value={field.value ?? []}
+                      segments={leadSegments}
+                      disabled={form.formState.isSubmitting}
+                      onChange={field.onChange}
                     />
                   </FormControl>
                   <FormMessage />

@@ -32,6 +32,7 @@ export const getLead = async (leadId: string) => {
       lead_source: { select: { id: true, name: true } },
       lead_status: { select: { id: true, name: true } },
       lead_type:   { select: { id: true, name: true } },
+      converted_opportunity: { select: { id: true, name: true } },
       segments: {
         include: {
           segment: { select: { id: true, name: true } },

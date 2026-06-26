@@ -40,6 +40,7 @@ interface DataTableRowActionsProps<TData> {
   leadSources: ConfigItem[];
   leadStatuses: ConfigItem[];
   leadTypes: ConfigItem[];
+  leadSegments: ConfigItem[];
 }
 
 export function DataTableRowActions<TData>({
@@ -47,6 +48,7 @@ export function DataTableRowActions<TData>({
   leadSources,
   leadStatuses,
   leadTypes,
+  leadSegments,
 }: DataTableRowActionsProps<TData>) {
   const router = useRouter();
   const lead = leadSchema.parse(row.original);
@@ -95,6 +97,7 @@ export function DataTableRowActions<TData>({
               leadSources={leadSources}
               leadStatuses={leadStatuses}
               leadTypes={leadTypes}
+              leadSegments={leadSegments}
             />
           </div>
         </SheetContent>

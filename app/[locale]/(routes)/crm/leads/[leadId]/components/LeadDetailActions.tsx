@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { MoreHorizontal } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -17,6 +19,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { UpdateLeadForm } from "../../components/UpdateLeadForm";
+import { convertLeadToOpportunity } from "@/actions/crm/leads/convert-lead-to-opportunity";
 
 type ConfigItem = { id: string; name: string };
 
@@ -25,6 +28,7 @@ interface LeadDetailActionsProps {
   leadSources: ConfigItem[];
   leadStatuses: ConfigItem[];
   leadTypes: ConfigItem[];
+  leadSegments: ConfigItem[];
 }
 
 export function LeadDetailActions({
@@ -32,8 +36,32 @@ export function LeadDetailActions({
   leadSources,
   leadStatuses,
   leadTypes,
+  leadSegments,
 }: LeadDetailActionsProps) {
+  const router = useRouter();
   const [updateOpen, setUpdateOpen] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
+
+  const onConvert = async () => {
+    setIsConverting(true);
+    try {
+      const result = await convertLeadToOpportunity({ leadId: lead.id });
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
+
+      toast.success(
+        result.data.alreadyConverted
+          ? "Lead already converted"
+          : "Lead converted to opportunity"
+      );
+      router.push(`/crm/opportunities/${result.data.opportunityId}`);
+      router.refresh();
+    } finally {
+      setIsConverting(false);
+    }
+  };
 
   return (
     <>
@@ -52,6 +80,7 @@ export function LeadDetailActions({
               leadSources={leadSources}
               leadStatuses={leadStatuses}
               leadTypes={leadTypes}
+              leadSegments={leadSegments}
             />
           </div>
         </SheetContent>
@@ -71,6 +100,12 @@ export function LeadDetailActions({
         <DropdownMenuContent align="end" className="w-[160px]">
           <DropdownMenuItem onClick={() => setUpdateOpen(true)}>
             Update
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={Boolean(lead.converted_opportunity_id) || isConverting}
+            onClick={onConvert}
+          >
+            {isConverting ? "Converting..." : "Convert"}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
