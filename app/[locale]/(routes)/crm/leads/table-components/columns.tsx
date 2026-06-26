@@ -4,15 +4,23 @@ import Link from "next/link";
 import { ColumnDef } from "@tanstack/react-table";
 
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 
-import { statuses } from "../table-data/data";
 import { Lead } from "../table-data/schema";
 import { DataTableColumnHeader } from "./data-table-column-header";
 import { DataTableRowActions } from "./data-table-row-actions";
 import moment from "moment";
 
 type ConfigItem = { id: string; name: string };
+
+const includesSelectedValue = (
+  rowValue: unknown,
+  selectedValues: string[]
+) => selectedValues.includes(String(rowValue ?? ""));
+
+const leadSegmentIds = (lead: Lead) =>
+  lead.segments
+    ?.map((member) => member.segment?.id ?? member.segment_id)
+    .filter(Boolean) ?? [];
 
 export const createColumns = (
   leadSources: ConfigItem[],
@@ -118,30 +126,95 @@ export const createColumns = (
     enableHiding: false,
   },
   {
-    accessorKey: "status",
+    accessorKey: "lead_status_id",
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Status" />
     ),
     cell: ({ row }) => {
-      const status = statuses.find(
-        (status) => status.value === row.getValue("status")
-      );
-
-      if (!status) {
-        return null;
-      }
-
+      const status = row.original.lead_status;
       return (
-        <div className="flex w-[100px] items-center">
-          {status.icon && (
-            <status.icon className="mr-2 h-4 w-4 text-muted-foreground" />
-          )}
-          <span>{status.label}</span>
+        <div className="w-[150px]">
+          {status?.name ? <Badge>{status.name}</Badge> : "Unassigned"}
         </div>
       );
     },
     filterFn: (row, id, value) => {
-      return value.includes(row.getValue(id));
+      return includesSelectedValue(row.getValue(id), value);
+    },
+  },
+  {
+    accessorKey: "lead_source_id",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Source" />
+    ),
+    cell: ({ row }) => (
+      <div className="w-[150px]">
+        {row.original.lead_source?.name ? (
+          <Badge variant="secondary">{row.original.lead_source.name}</Badge>
+        ) : (
+          "Unassigned"
+        )}
+      </div>
+    ),
+    enableSorting: false,
+    enableHiding: true,
+    filterFn: (row, id, value) => {
+      return includesSelectedValue(row.getValue(id), value);
+    },
+  },
+  {
+    accessorKey: "lead_type_id",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Type" />
+    ),
+    cell: ({ row }) => (
+      <div className="w-[140px]">
+        {row.original.lead_type?.name ? (
+          <Badge variant="outline">{row.original.lead_type.name}</Badge>
+        ) : (
+          "Unassigned"
+        )}
+      </div>
+    ),
+    enableSorting: false,
+    enableHiding: true,
+    filterFn: (row, id, value) => {
+      return includesSelectedValue(row.getValue(id), value);
+    },
+  },
+  {
+    id: "segments",
+    accessorFn: (row) => leadSegmentIds(row).join("|"),
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Segments" />
+    ),
+    cell: ({ row }) => {
+      const segments = row.original.segments
+        ?.map((member) => member.segment)
+        .filter((segment) => Boolean(segment?.id));
+
+      if (!segments?.length) return <div className="w-[180px]">None</div>;
+
+      return (
+        <div className="flex w-[220px] flex-wrap gap-1">
+          {segments.slice(0, 2).map((segment) => (
+            <Badge key={segment?.id} variant="secondary">
+              {segment?.name ?? "Unnamed segment"}
+            </Badge>
+          ))}
+          {segments.length > 2 ? (
+            <Badge variant="outline">+{segments.length - 2}</Badge>
+          ) : null}
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableHiding: true,
+    filterFn: (row, _id, value) => {
+      const segmentIds = leadSegmentIds(row.original);
+      return value.some((selectedSegmentId: string) =>
+        segmentIds.includes(selectedSegmentId)
+      );
     },
   },
   {

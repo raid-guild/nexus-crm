@@ -10,6 +10,7 @@ jest.mock("@/lib/prisma", () => ({
     },
     crm_Lead_Sources: {
       findMany: jest.fn(),
+      findFirst: jest.fn(),
     },
     crm_Lead_Types: {
       findMany: jest.fn(),
@@ -32,6 +33,9 @@ jest.mock("@/lib/prisma", () => ({
     },
     crm_AuditLog: {
       createMany: jest.fn(),
+    },
+    users: {
+      findUnique: jest.fn(),
     },
   },
 }));
@@ -151,6 +155,40 @@ describe("crm lead MCP tools", () => {
     expect(mockPrisma.crm_Leads.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         assigned_to: "user-1",
+        createdBy: "user-1",
+        updatedBy: "user-1",
+      }),
+    });
+  });
+
+  it("creates a lead assigned to a requested user and maps account_id", async () => {
+    (mockPrisma.users.findUnique as jest.Mock).mockResolvedValue({
+      id: "user-2",
+    });
+    (mockPrisma.crm_Leads.create as jest.Mock).mockResolvedValue({
+      id: "lead-1",
+      assigned_to: "user-2",
+      accountsIDs: "account-1",
+    });
+
+    await tool("crm_create_lead").handler(
+      {
+        lastName: "Lead",
+        email: "lead@example.com",
+        assigned_to: "user-2",
+        account_id: "account-1",
+      },
+      "user-1",
+    );
+
+    expect(mockPrisma.users.findUnique).toHaveBeenCalledWith({
+      where: { id: "user-2" },
+      select: { id: true },
+    });
+    expect(mockPrisma.crm_Leads.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        assigned_to: "user-2",
+        accountsIDs: "account-1",
         createdBy: "user-1",
         updatedBy: "user-1",
       }),
@@ -279,6 +317,35 @@ describe("crm lead MCP tools", () => {
       created: 2,
       duplicateCount: 0,
       createdLeadIds: ["lead-1", "lead-2"],
+    });
+  });
+
+  it("applies an import source to imported leads without per-lead source", async () => {
+    (mockPrisma.crm_Lead_Sources.findFirst as jest.Mock).mockResolvedValue({
+      id: "source-scrape",
+    });
+    (mockPrisma.crm_Leads.findMany as jest.Mock).mockResolvedValue([]);
+    (mockPrisma.crm_Leads.create as jest.Mock).mockResolvedValue({ id: "lead-1" });
+
+    await tool("crm_import_leads").handler(
+      {
+        leads: [{ lastName: "One", email: "one@example.com" }],
+        source: "Scrape",
+        dryRun: false,
+        dedupe_keys: ["email"],
+      },
+      "user-1",
+    );
+
+    expect(mockPrisma.crm_Lead_Sources.findFirst).toHaveBeenCalledWith({
+      where: { name: { equals: "Scrape", mode: "insensitive" } },
+      select: { id: true },
+    });
+    expect(mockPrisma.crm_Leads.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        lead_source_id: "source-scrape",
+        assigned_to: "user-1",
+      }),
     });
   });
 

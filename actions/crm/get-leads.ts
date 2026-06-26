@@ -29,6 +29,11 @@ export const getLeads = cache(async () => {
       lead_source: { select: { id: true, name: true } },
       lead_status: { select: { id: true, name: true } },
       lead_type: { select: { id: true, name: true } },
+      segments: {
+        include: {
+          segment: { select: { id: true, name: true } },
+        },
+      },
       // Include assigned accounts
       assigned_accounts: true,
       // Include documents through DocumentsToLeads junction table

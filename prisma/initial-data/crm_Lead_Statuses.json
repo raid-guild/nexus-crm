@@ -1,6 +1,10 @@
 [
   { "name": "New" },
-  { "name": "Contacted" },
+  { "name": "Researching" },
+  { "name": "Cold Outreach" },
+  { "name": "Follow Up" },
   { "name": "Qualified" },
+  { "name": "Converted to Opportunity" },
+  { "name": "Nurture" },
   { "name": "Lost" }
 ]

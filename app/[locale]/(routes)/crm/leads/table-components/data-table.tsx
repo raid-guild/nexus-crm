@@ -29,6 +29,7 @@ import { DataTablePagination } from "./data-table-pagination";
 import { DataTableToolbar } from "./data-table-toolbar";
 import { PanelTopClose, PanelTopOpen } from "lucide-react";
 import { createColumns } from "./columns";
+import type { Lead } from "../table-data/schema";
 
 type ConfigItem = { id: string; name: string };
 
@@ -47,6 +48,33 @@ export function LeadDataTable<TData, TValue>({
   leadTypes = [],
 }: DataTableProps<TData, TValue>) {
   const columns = createColumns(leadSources, leadStatuses, leadTypes) as ColumnDef<TData, TValue>[];
+  const leadSegments = React.useMemo(() => {
+    const segments = new Map<string, string>();
+
+    for (const lead of data as Lead[]) {
+      for (const member of lead.segments ?? []) {
+        const id = member.segment?.id ?? member.segment_id;
+        if (!id) continue;
+        segments.set(id, member.segment?.name ?? "Unnamed segment");
+      }
+    }
+
+    return Array.from(segments, ([value, label]) => ({ value, label })).sort(
+      (a, b) => a.label.localeCompare(b.label)
+    );
+  }, [data]);
+  const leadSourceOptions = React.useMemo(
+    () => leadSources.map((source) => ({ value: source.id, label: source.name })),
+    [leadSources]
+  );
+  const leadStatusOptions = React.useMemo(
+    () => leadStatuses.map((status) => ({ value: status.id, label: status.name })),
+    [leadStatuses]
+  );
+  const leadTypeOptions = React.useMemo(
+    () => leadTypes.map((type) => ({ value: type.id, label: type.name })),
+    [leadTypes]
+  );
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -104,7 +132,13 @@ export function LeadDataTable<TData, TValue>({
         </div>
       ) : (
         <>
-          <DataTableToolbar table={table} />
+          <DataTableToolbar
+            table={table}
+            leadSources={leadSourceOptions}
+            leadStatuses={leadStatusOptions}
+            leadTypes={leadTypeOptions}
+            leadSegments={leadSegments}
+          />
           <div className="rounded-md border overflow-x-auto">
             <Table data-testid="leads-table">
               <TableHeader>

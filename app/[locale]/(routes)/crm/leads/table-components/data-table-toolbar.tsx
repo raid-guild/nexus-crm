@@ -7,21 +7,33 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DataTableViewOptions } from "./data-table-view-options";
 
-import { statuses } from "../table-data/data";
 import { DataTableFacetedFilter } from "./data-table-faceted-filter";
+
+type FilterOption = {
+  label: string;
+  value: string;
+};
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>;
+  leadSources: FilterOption[];
+  leadStatuses: FilterOption[];
+  leadTypes: FilterOption[];
+  leadSegments: FilterOption[];
 }
 
 export function DataTableToolbar<TData>({
   table,
+  leadSources,
+  leadStatuses,
+  leadTypes,
+  leadSegments,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0;
 
   return (
-    <div className="flex items-center justify-between">
-      <div className="flex flex-1 items-center space-x-2">
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-1 flex-wrap items-center gap-2">
         <Input
           placeholder="Filter leads ..."
           value={(table.getColumn("company")?.getFilterValue() as string) ?? ""}
@@ -30,33 +42,34 @@ export function DataTableToolbar<TData>({
           }
           className="h-8 w-[150px] lg:w-[250px]"
         />
-        {/*         <Input
-          placeholder="Filter by assigned user ..."
-          value={
-            (table.getColumn("assigned_to_user")?.getFilterValue() as string) ??
-            ""
-          }
-          onChange={(event) =>
-            table
-              .getColumn("assigned_to_user")
-              ?.setFilterValue(event.target.value)
-          }
-          className="h-8 w-[150px] lg:w-[250px]"
-        /> */}
-        {table.getColumn("status") && (
+        {table.getColumn("lead_status_id") && (
           <DataTableFacetedFilter
-            column={table.getColumn("status")}
+            column={table.getColumn("lead_status_id")}
             title="Status"
-            options={statuses}
+            options={leadStatuses}
           />
         )}
-        {/*        {table.getColumn("priority") && (
+        {table.getColumn("lead_source_id") && leadSources.length > 0 && (
           <DataTableFacetedFilter
-            column={table.getColumn("priority")}
-            title="Priority"
-            options={priorities}
+            column={table.getColumn("lead_source_id")}
+            title="Source"
+            options={leadSources}
           />
-        )} */}
+        )}
+        {table.getColumn("lead_type_id") && leadTypes.length > 0 && (
+          <DataTableFacetedFilter
+            column={table.getColumn("lead_type_id")}
+            title="Type"
+            options={leadTypes}
+          />
+        )}
+        {table.getColumn("segments") && leadSegments.length > 0 && (
+          <DataTableFacetedFilter
+            column={table.getColumn("segments")}
+            title="Segment"
+            options={leadSegments}
+          />
+        )}
         {isFiltered && (
           <Button
             variant="ghost"

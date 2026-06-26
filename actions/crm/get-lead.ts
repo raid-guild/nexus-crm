@@ -32,6 +32,11 @@ export const getLead = async (leadId: string) => {
       lead_source: { select: { id: true, name: true } },
       lead_status: { select: { id: true, name: true } },
       lead_type:   { select: { id: true, name: true } },
+      segments: {
+        include: {
+          segment: { select: { id: true, name: true } },
+        },
+      },
       // Include assigned user (uses "LeadAssignedTo" relation)
       assigned_to_user: {
         select: {
