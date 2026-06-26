@@ -190,16 +190,19 @@ export const createColumns = (
     ),
     cell: ({ row }) => {
       const segments = row.original.segments
-        ?.map((member) => member.segment)
-        .filter((segment) => Boolean(segment?.id));
+        ?.map((member) => ({
+          id: member.segment?.id ?? member.segment_id,
+          name: member.segment?.name ?? "Unnamed segment",
+        }))
+        .filter((segment) => Boolean(segment.id));
 
       if (!segments?.length) return <div className="w-[180px]">None</div>;
 
       return (
         <div className="flex w-[220px] flex-wrap gap-1">
           {segments.slice(0, 2).map((segment) => (
-            <Badge key={segment?.id} variant="secondary">
-              {segment?.name ?? "Unnamed segment"}
+            <Badge key={segment.id} variant="secondary">
+              {segment.name}
             </Badge>
           ))}
           {segments.length > 2 ? (

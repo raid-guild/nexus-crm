@@ -88,6 +88,10 @@ function dedupeKeyForLead(
     .join("|");
 }
 
+function scopedDedupeKey(assignedTo: string, key: string) {
+  return `${assignedTo}:${key}`;
+}
+
 function exactInsensitive(field: "email" | "company" | "phone", value: string) {
   return { [field]: { equals: value, mode: "insensitive" as const } };
 }
@@ -100,8 +104,16 @@ function resolveAccountId(args: { account_id?: string; accountIDs?: string }) {
   return args.account_id ?? args.accountIDs;
 }
 
-async function validateAssignedUser(assignedTo?: string) {
-  if (!assignedTo) return;
+async function validateAssignedUser(assignedTo: string | undefined, userId: string) {
+  if (!assignedTo || assignedTo === userId) return;
+
+  const caller = await prismadb.users.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true },
+  });
+  if (!caller || (caller.role !== "admin" && caller.role !== "manager")) {
+    notFound("User");
+  }
 
   const user = await prismadb.users.findUnique({
     where: { id: assignedTo },
@@ -278,7 +290,7 @@ export const crmLeadTools = [
     ) {
       const { lastName, account_id, accountIDs, assigned_to, ...rest } = args;
       const assignedTo = assigned_to ?? userId;
-      await validateAssignedUser(assigned_to);
+      await validateAssignedUser(assigned_to, userId);
       const lead = await prismadb.crm_Leads.create({
         data: {
           v: 0,
@@ -326,7 +338,7 @@ export const crmLeadTools = [
       });
       if (!existing) notFound("Lead");
       const { id, account_id, accountIDs, assigned_to, ...updateData } = args;
-      await validateAssignedUser(assigned_to);
+      await validateAssignedUser(assigned_to, userId);
       const accountId = resolveAccountId({ account_id, accountIDs });
       const lead = await prismadb.crm_Leads.update({
         where: { id },
@@ -446,6 +458,16 @@ export const crmLeadTools = [
       userId: string
     ) {
       const importSourceId = await resolveLeadSourceIdByName(args.source);
+      const leadsWithAssignees = await Promise.all(
+        args.leads.map(async (lead, index) => {
+          await validateAssignedUser(lead.assigned_to, userId);
+          return {
+            index,
+            lead,
+            assignedTo: lead.assigned_to ?? userId,
+          };
+        })
+      );
 
       if (args.segment_id) {
         const segment = await prismadb.crm_Lead_Segments.findFirst({
@@ -456,50 +478,78 @@ export const crmLeadTools = [
       }
 
       const dedupeFilters = [
-        ...args.leads
+        ...leadsWithAssignees
+          .map((item) => item.lead)
           .filter((lead) => lead.email)
           .map((lead) => exactInsensitive("email", lead.email as string)),
-        ...args.leads
+        ...leadsWithAssignees
+          .map((item) => item.lead)
           .filter((lead) => lead.company)
           .map((lead) => exactInsensitive("company", lead.company as string)),
-        ...args.leads
+        ...leadsWithAssignees
+          .map((item) => item.lead)
           .filter((lead) => lead.phone)
           .map((lead) => exactInsensitive("phone", lead.phone as string)),
       ];
+      const assignedToIds = Array.from(
+        new Set(leadsWithAssignees.map((item) => item.assignedTo))
+      );
 
       const existing: Array<{
         id: string;
+        assigned_to: string | null;
         email: string | null;
         company: string | null;
         phone: string | null;
       }> = dedupeFilters.length
         ? await prismadb.crm_Leads.findMany({
             where: {
-              assigned_to: userId,
+              assigned_to: { in: assignedToIds },
               deletedAt: null,
               OR: dedupeFilters,
             },
-            select: { id: true, email: true, company: true, phone: true },
+            select: {
+              id: true,
+              assigned_to: true,
+              email: true,
+              company: true,
+              phone: true,
+            },
           })
         : [];
-      const existingKeys = new Set(
-        existing.map((lead) => dedupeKeyForLead(lead, args.dedupe_keys))
+      const existingKeys = new Set<string>(
+        existing
+          .map((lead) => {
+            const key = dedupeKeyForLead(lead, args.dedupe_keys);
+            return key && lead.assigned_to
+              ? scopedDedupeKey(lead.assigned_to, key)
+              : null;
+          })
+          .filter((key): key is string => Boolean(key))
       );
 
       const seenImportKeys = new Set<string>();
-      const candidates = args.leads.map((lead, index) => {
+      const candidates = leadsWithAssignees.map(({ lead, index, assignedTo }) => {
         const key = dedupeKeyForLead(lead, args.dedupe_keys);
-        const duplicate = Boolean(key && (existingKeys.has(key) || seenImportKeys.has(key)));
-        if (key) seenImportKeys.add(key);
-        return { index, lead, key, duplicate };
+        const scopedKey = key ? scopedDedupeKey(assignedTo, key) : "";
+        const duplicate = Boolean(
+          scopedKey &&
+            (existingKeys.has(scopedKey) || seenImportKeys.has(scopedKey))
+        );
+        if (scopedKey) seenImportKeys.add(scopedKey);
+        return { index, lead, key, assignedTo, duplicate };
       });
 
       if (args.dryRun) {
+        const duplicates = candidates
+          .filter((candidate) => candidate.duplicate)
+          .map(({ assignedTo: _assignedTo, ...candidate }) => candidate);
+
         return itemResponse({
           dryRun: true,
           requested: args.leads.length,
           wouldCreate: candidates.filter((candidate) => !candidate.duplicate).length,
-          duplicates: candidates.filter((candidate) => candidate.duplicate),
+          duplicates,
         });
       }
 
@@ -508,13 +558,12 @@ export const crmLeadTools = [
         if (candidate.duplicate) continue;
         const { account_id, accountIDs, assigned_to, lead_source_id, ...leadData } =
           candidate.lead;
-        await validateAssignedUser(assigned_to);
         const lead = await prismadb.crm_Leads.create({
           data: {
             v: 0,
             ...leadData,
             lead_source_id: lead_source_id ?? importSourceId,
-            assigned_to: assigned_to ?? userId,
+            assigned_to: candidate.assignedTo,
             accountsIDs: resolveAccountId({ account_id, accountIDs }),
             createdBy: userId,
             updatedBy: userId,

@@ -224,7 +224,10 @@ export async function BasicView({ data }: OppsViewProps) {
                   {data.segments?.length ? (
                     <div className="flex flex-wrap gap-1">
                       {data.segments.map((member: any) => (
-                        <Badge key={member.segment_id} variant="secondary">
+                        <Badge
+                          key={member.segment?.id ?? member.segment_id}
+                          variant="secondary"
+                        >
                           {member.segment?.name ?? "Unnamed segment"}
                         </Badge>
                       ))}

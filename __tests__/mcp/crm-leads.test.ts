@@ -162,9 +162,9 @@ describe("crm lead MCP tools", () => {
   });
 
   it("creates a lead assigned to a requested user and maps account_id", async () => {
-    (mockPrisma.users.findUnique as jest.Mock).mockResolvedValue({
-      id: "user-2",
-    });
+    (mockPrisma.users.findUnique as jest.Mock)
+      .mockResolvedValueOnce({ id: "user-1", role: "manager" })
+      .mockResolvedValueOnce({ id: "user-2" });
     (mockPrisma.crm_Leads.create as jest.Mock).mockResolvedValue({
       id: "lead-1",
       assigned_to: "user-2",
@@ -181,7 +181,11 @@ describe("crm lead MCP tools", () => {
       "user-1",
     );
 
-    expect(mockPrisma.users.findUnique).toHaveBeenCalledWith({
+    expect(mockPrisma.users.findUnique).toHaveBeenNthCalledWith(1, {
+      where: { id: "user-1" },
+      select: { id: true, role: true },
+    });
+    expect(mockPrisma.users.findUnique).toHaveBeenNthCalledWith(2, {
       where: { id: "user-2" },
       select: { id: true },
     });
@@ -195,10 +199,30 @@ describe("crm lead MCP tools", () => {
     });
   });
 
+  it("rejects assigning a lead to another user for non-manager MCP users", async () => {
+    (mockPrisma.users.findUnique as jest.Mock).mockResolvedValue({
+      id: "user-1",
+      role: "user",
+    });
+
+    await expect(
+      tool("crm_create_lead").handler(
+        {
+          lastName: "Lead",
+          assigned_to: "user-2",
+        },
+        "user-1",
+      ),
+    ).rejects.toThrow("NOT_FOUND");
+
+    expect(mockPrisma.crm_Leads.create).not.toHaveBeenCalled();
+  });
+
   it("dry-runs lead import with duplicate detection", async () => {
     (mockPrisma.crm_Leads.findMany as jest.Mock).mockResolvedValue([
       {
         id: "existing-1",
+        assigned_to: "user-1",
         email: "same@example.com",
         company: null,
         phone: null,
@@ -237,6 +261,7 @@ describe("crm lead MCP tools", () => {
     (mockPrisma.crm_Leads.findMany as jest.Mock).mockResolvedValue([
       {
         id: "existing-1",
+        assigned_to: "user-1",
         email: "Same@Example.com",
         company: "ACME Services",
         phone: null,
@@ -260,15 +285,71 @@ describe("crm lead MCP tools", () => {
 
     expect(mockPrisma.crm_Leads.findMany).toHaveBeenCalledWith({
       where: {
-        assigned_to: "user-1",
+        assigned_to: { in: ["user-1"] },
         deletedAt: null,
         OR: [
           { email: { equals: "same@example.com", mode: "insensitive" } },
           { company: { equals: "acme services", mode: "insensitive" } },
         ],
       },
-      select: { id: true, email: true, company: true, phone: true },
+      select: {
+        id: true,
+        assigned_to: true,
+        email: true,
+        company: true,
+        phone: true,
+      },
     });
+  });
+
+  it("dedupes imported leads against their effective assignee", async () => {
+    (mockPrisma.users.findUnique as jest.Mock)
+      .mockResolvedValueOnce({ id: "user-1", role: "admin" })
+      .mockResolvedValueOnce({ id: "user-2" });
+    (mockPrisma.crm_Leads.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: "existing-1",
+        assigned_to: "user-2",
+        email: "same@example.com",
+        company: null,
+        phone: null,
+      },
+    ]);
+
+    const result = await tool("crm_import_leads").handler(
+      {
+        leads: [
+          {
+            lastName: "One",
+            email: "same@example.com",
+            assigned_to: "user-2",
+          },
+        ],
+        dryRun: true,
+        dedupe_keys: ["email"],
+      },
+      "user-1",
+    );
+
+    expect(mockPrisma.crm_Leads.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          assigned_to: { in: ["user-2"] },
+        }),
+      }),
+    );
+    expect(result.data.duplicates).toEqual([
+      {
+        index: 0,
+        lead: {
+          lastName: "One",
+          email: "same@example.com",
+          assigned_to: "user-2",
+        },
+        key: "email:same@example.com",
+        duplicate: true,
+      },
+    ]);
   });
 
   it("imports new leads and attaches them to a segment", async () => {
