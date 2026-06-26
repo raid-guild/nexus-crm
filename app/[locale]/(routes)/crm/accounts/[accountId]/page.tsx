@@ -15,6 +15,7 @@ import { getProductsFull } from "@/actions/crm/products/get-products";
 import { serializeDecimalsList } from "@/lib/serialize-decimals";
 import { getAccountsTasks } from "@/actions/crm/account/get-tasks";
 import { getInvoicesByAccountId } from "@/actions/invoices/get-invoices-by-accountId";
+import { getLeadSegments } from "@/actions/crm/leads/segments";
 import { getTranslations } from "next-intl/server";
 
 import OpportunitiesView from "../../components/OpportunitiesView";
@@ -85,6 +86,7 @@ const AccountDetailPage = async (props: AccountDetailPageProps) => {
     currency: t("table.currency"),
   };
   const crmData = await getAllCrmData();
+  const leadSegments = await getLeadSegments();
   const accountProducts = serializeDecimalsList(
     await getAccountProducts(accountId)
   );
@@ -122,7 +124,11 @@ const AccountDetailPage = async (props: AccountDetailPageProps) => {
               crmData={crmData}
               accountId={accountId}
             />
-            <LeadsView data={leads} crmData={crmData} />
+            <LeadsView
+              data={leads}
+              crmData={crmData}
+              leadSegments={leadSegments}
+            />
             <AccountProductsView
               data={accountProducts}
               accountId={accountId}

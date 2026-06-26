@@ -35,10 +35,10 @@ type CrmData = Awaited<ReturnType<typeof getAllCrmData>>;
 interface LeadsViewProps {
   data: any[];
   crmData: CrmData;
-  leadSegments: { id: string; name: string }[];
+  leadSegments?: { id: string; name: string }[];
 }
 
-const LeadsView = ({ data, crmData, leadSegments }: LeadsViewProps) => {
+const LeadsView = ({ data, crmData, leadSegments = [] }: LeadsViewProps) => {
   const { accounts, leadSources, leadStatuses, leadTypes } = crmData;
   const [open, setOpen] = useState(false);
   const router = useRouter();
