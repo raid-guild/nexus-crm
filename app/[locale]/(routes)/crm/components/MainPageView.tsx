@@ -6,6 +6,7 @@ import { getAllCrmData } from "@/actions/crm/get-crm-data";
 import { getLeads } from "@/actions/crm/get-leads";
 import { getContractsWithIncludes } from "@/actions/crm/get-contracts";
 import { getOpportunitiesFull } from "@/actions/crm/get-opportunities-with-includes";
+import { getLeadSegments } from "@/actions/crm/leads/segments";
 
 import AccountsView from "./AccountsView";
 import ContactsView from "./ContactsView";
@@ -14,7 +15,7 @@ import LeadsView from "./LeadsView";
 import ContractsView from "./ContractsView";
 
 const MainPageView = async () => {
-  const [crmData, accounts, contacts, opportunities, leads, contracts] =
+  const [crmData, accounts, contacts, opportunities, leads, contracts, leadSegments] =
     await Promise.all([
       getAllCrmData(),
       getAccounts(),
@@ -22,13 +23,14 @@ const MainPageView = async () => {
       getOpportunitiesFull(),
       getLeads(),
       getContractsWithIncludes(),
+      getLeadSegments(),
     ]);
   return (
     <>
       <AccountsView crmData={crmData} data={accounts} />
       <OpportunitiesView crmData={crmData} data={opportunities} />
       <ContactsView crmData={crmData} data={contacts} />
-      <LeadsView crmData={crmData} data={leads} />
+      <LeadsView crmData={crmData} data={leads} leadSegments={leadSegments} />
       <ContractsView crmData={crmData} data={contracts} />
     </>
   );
