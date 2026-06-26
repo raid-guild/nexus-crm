@@ -5,7 +5,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { crm_Opportunities } from "@prisma/client";
 import {
   CalendarDays,
   ClipboardList,
@@ -31,6 +30,7 @@ import { EnvelopeClosedIcon, LightningBoltIcon } from "@radix-ui/react-icons";
 import { LucideLandmark } from "lucide-react";
 import { LeadDetailActions } from "./LeadDetailActions";
 import { getAllCrmData } from "@/actions/crm/get-crm-data";
+import { Badge } from "@/components/ui/badge";
 
 interface OppsViewProps {
   data: any;
@@ -38,7 +38,10 @@ interface OppsViewProps {
 
 export async function BasicView({ data }: OppsViewProps) {
   //console.log(data, "data");
-  const users = await prismadb.users.findMany();
+  const users: Array<{ id: string; name: string | null }> =
+    await prismadb.users.findMany({
+      select: { id: true, name: true },
+    });
   const crmData = await getAllCrmData();
   const { leadSources, leadStatuses, leadTypes } = crmData;
   if (!data) return <div>Opportunity not found</div>;
@@ -212,6 +215,26 @@ export async function BasicView({ data }: OppsViewProps) {
                   <p className="text-sm text-muted-foreground">
                     {data.lead_source?.name ?? "—"}
                   </p>
+                </div>
+              </div>
+              <div className="-mx-2 flex items-start space-x-4 rounded-md p-2 transition-all hover:bg-accent hover:text-accent-foreground">
+                <SquareStack className="mt-px h-5 w-5" />
+                <div className="space-y-2">
+                  <p className="text-sm font-medium leading-none">Segments</p>
+                  {data.segments?.length ? (
+                    <div className="flex flex-wrap gap-1">
+                      {data.segments.map((member: any) => (
+                        <Badge
+                          key={member.segment?.id ?? member.segment_id}
+                          variant="secondary"
+                        >
+                          {member.segment?.name ?? "Unnamed segment"}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">—</p>
+                  )}
                 </div>
               </div>
               <div className="-mx-2 flex items-start space-x-4 rounded-md p-2 transition-all hover:bg-accent hover:text-accent-foreground">

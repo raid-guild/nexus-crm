@@ -106,7 +106,6 @@ const PREFERRED_COLUMN_ORDER = [
   "New",
   "Researching",
   "Cold Outreach",
-  "Contacted",
   "Follow Up",
   "Qualified",
   "Converted to Opportunity",

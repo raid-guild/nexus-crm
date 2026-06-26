@@ -4,5 +4,11 @@
   { "name": "Cold Call" },
   { "name": "Email Campaign" },
   { "name": "Event" },
+  { "name": "Discord Agent" },
+  { "name": "Portal" },
+  { "name": "Import" },
+  { "name": "Form" },
+  { "name": "Scrape" },
+  { "name": "Job Listing" },
   { "name": "Other" }
 ]

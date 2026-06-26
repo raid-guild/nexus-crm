@@ -66,8 +66,8 @@ export const updateLead = async (data: {
         lead_type_id: lead_type_id || undefined,
         refered_by,
         campaign,
-        assigned_to: assigned_to || userId,
-        accountsIDs: accountIDs,
+        assigned_to: assigned_to === undefined ? undefined : assigned_to || null,
+        accountsIDs: accountIDs === undefined ? undefined : accountIDs || null,
       },
     });
 
