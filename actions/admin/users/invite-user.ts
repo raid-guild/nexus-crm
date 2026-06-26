@@ -3,12 +3,13 @@ import { prismadb } from "@/lib/prisma";
 import InviteUserEmail from "@/emails/InviteUser";
 import resendHelper from "@/lib/resend";
 import { revalidatePath } from "next/cache";
-import { Language } from "@prisma/client";
 import {
   requireRole,
   AuthenticationError,
   AuthorizationError,
 } from "@/lib/authz";
+
+type Language = "cz" | "en" | "de" | "uk";
 
 export const inviteUser = async (data: {
   name: string;

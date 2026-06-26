@@ -2,7 +2,8 @@
 import { getSession } from "@/lib/auth-server";
 import { prismadb } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { Language } from "@prisma/client";
+
+type Language = "cz" | "en" | "de" | "uk";
 
 export const setLanguage = async (data: {
   userId: string;

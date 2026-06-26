@@ -65,6 +65,7 @@ type CrmData = {
   leadSources: ConfigItem[];
   leadStatuses: ConfigItem[];
   leadTypes: ConfigItem[];
+  leadSegments: ConfigItem[];
 };
 
 type Lead = {
@@ -379,6 +380,7 @@ function LeadDetailSheet({
                 leadSources={crmData.leadSources}
                 leadStatuses={crmData.leadStatuses}
                 leadTypes={crmData.leadTypes}
+                leadSegments={crmData.leadSegments}
               />
 
               <ActivitiesView
