@@ -84,6 +84,7 @@ model crm_Leads {
   email             String?
   phone             String?
   description       String?
+  probability_score Int?
   lead_source_id  String?            @db.Uuid
   lead_status_id  String?            @db.Uuid
   lead_type_id    String?            @db.Uuid

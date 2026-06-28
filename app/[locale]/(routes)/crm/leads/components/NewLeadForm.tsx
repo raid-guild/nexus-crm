@@ -43,6 +43,13 @@ type NewTaskFormProps = {
 export function NewLeadForm({ accounts, leadSources, leadStatuses, leadTypes, leadSegments, onFinish }: NewTaskFormProps) {
   const t = useTranslations("CrmLeadForm");
   const c = useTranslations("Common");
+  const probabilityScoreSchema = z
+    .number()
+    .int(t("probabilityScoreInvalid"))
+    .min(0, t("probabilityScoreInvalid"))
+    .max(100, t("probabilityScoreInvalid"))
+    .nullable()
+    .optional();
 
   const formSchema = z.object({
     first_name: z.string().optional(),
@@ -52,6 +59,7 @@ export function NewLeadForm({ accounts, leadSources, leadStatuses, leadTypes, le
     email: z.string().email(t("emailInvalid")).or(z.literal("")).optional(),
     phone: z.string().min(0).max(15).optional(),
     description: z.string().optional(),
+    probability_score: probabilityScoreSchema,
     lead_source_id: z.string().optional(),
     lead_status_id: z.string().optional(),
     lead_type_id: z.string().optional(),
@@ -75,6 +83,7 @@ export function NewLeadForm({ accounts, leadSources, leadStatuses, leadTypes, le
       email: "",
       phone: "",
       description: "",
+      probability_score: null,
       lead_source_id: "",
       lead_status_id: "",
       lead_type_id: "",
@@ -217,6 +226,37 @@ export function NewLeadForm({ accounts, leadSources, leadStatuses, leadTypes, le
                       disabled={form.formState.isSubmitting}
                       placeholder="New NextCRM functionality"
                       {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="probability_score"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("probabilityScore")}</FormLabel>
+                  <FormControl>
+                    <Input
+                      disabled={form.formState.isSubmitting}
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={1}
+                      placeholder={t("probabilityScorePlaceholder")}
+                      value={field.value ?? ""}
+                      onChange={(event) =>
+                        field.onChange(
+                          event.target.value === ""
+                            ? null
+                            : Number(event.target.value)
+                        )
+                      }
+                      onBlur={field.onBlur}
+                      name={field.name}
+                      ref={field.ref}
                     />
                   </FormControl>
                   <FormMessage />

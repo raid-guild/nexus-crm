@@ -17,6 +17,7 @@ export const updateLead = async (data: {
   email?: string | null;
   phone?: string | null;
   description?: string | null;
+  probability_score?: number | null;
   lead_source_id?: string | null;
   lead_status_id?: string | null;
   lead_type_id?: string | null;
@@ -39,6 +40,7 @@ export const updateLead = async (data: {
     email,
     phone,
     description,
+    probability_score,
     lead_source_id,
     lead_status_id,
     lead_type_id,
@@ -50,6 +52,15 @@ export const updateLead = async (data: {
   } = data;
 
   if (!id) return { error: "id is required" };
+  if (
+    probability_score !== undefined &&
+    probability_score !== null &&
+    (!Number.isInteger(probability_score) ||
+      probability_score < 0 ||
+      probability_score > 100)
+  ) {
+    return { error: "Probability score must be a whole number between 0 and 100" };
+  }
 
   try {
     const currentUser = await prismadb.users.findUnique({
@@ -71,6 +82,8 @@ export const updateLead = async (data: {
         email,
         phone,
         description,
+        probability_score:
+          probability_score === undefined ? undefined : probability_score,
         lead_source_id: lead_source_id || undefined,
         lead_status_id: lead_status_id || undefined,
         lead_type_id: lead_type_id || undefined,

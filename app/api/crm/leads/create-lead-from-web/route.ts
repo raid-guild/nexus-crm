@@ -1,6 +1,17 @@
 import { prismadb } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
+function parseProbabilityScore(value: unknown) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value === "number") return Number.isFinite(value) ? value : NaN;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed || !/^-?\d+(\.\d+)?$/.test(trimmed)) return NaN;
+    return Number(trimmed);
+  }
+  return NaN;
+}
+
 export async function POST(req: Request) {
   if (req.headers.get("content-type") !== "application/json") {
     return NextResponse.json(
@@ -19,7 +30,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: "No headers" }, { status: 400 });
   }
 
-  const { firstName, lastName, account, job, email, phone, lead_source } = body;
+  const {
+    firstName,
+    lastName,
+    account,
+    job,
+    email,
+    phone,
+    lead_source,
+    probability_score,
+  } = body;
+  const probabilityScore = parseProbabilityScore(probability_score);
 
   //Validate auth with token from .env.local
   const token = headers.get("authorization");
@@ -45,6 +66,17 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+    if (
+      probabilityScore !== undefined &&
+      (!Number.isInteger(probabilityScore) ||
+        probabilityScore < 0 ||
+        probabilityScore > 100)
+    ) {
+      return NextResponse.json(
+        { message: "Probability score must be a whole number between 0 and 100" },
+        { status: 400 }
+      );
+    }
     try {
       await prismadb.crm_Leads.create({
         data: {
@@ -55,6 +87,7 @@ export async function POST(req: Request) {
           jobTitle: job,
           email,
           phone,
+          probability_score: probabilityScore,
         },
       });
 

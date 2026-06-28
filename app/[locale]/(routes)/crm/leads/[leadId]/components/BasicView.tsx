@@ -32,6 +32,7 @@ import { LeadDetailActions } from "./LeadDetailActions";
 import { getAllCrmData } from "@/actions/crm/get-crm-data";
 import { Badge } from "@/components/ui/badge";
 import { getLeadSegments } from "@/actions/crm/leads/segments";
+import { getTranslations } from "next-intl/server";
 
 interface OppsViewProps {
   data: any;
@@ -45,6 +46,7 @@ export async function BasicView({ data }: OppsViewProps) {
     });
   const crmData = await getAllCrmData();
   const leadSegments = await getLeadSegments();
+  const leadFormT = await getTranslations("CrmLeadForm");
   const { leadSources, leadStatuses, leadTypes } = crmData;
   if (!data) return <div>Opportunity not found</div>;
   return (
@@ -200,6 +202,19 @@ export async function BasicView({ data }: OppsViewProps) {
                 <div className="space-y-1">
                   <p className="text-sm font-medium leading-none">Status</p>
                   <p className="text-sm text-muted-foreground">{data.lead_status?.name ?? "—"}</p>
+                </div>
+              </div>
+              <div className="-mx-2 flex items-start space-x-4 rounded-md p-2 transition-all hover:bg-accent hover:text-accent-foreground">
+                <Percent className="mt-px h-5 w-5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium leading-none">
+                    {leadFormT("probabilityScore")}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {data.probability_score == null
+                      ? "—"
+                      : `${data.probability_score}%`}
+                  </p>
                 </div>
               </div>
               <div className="-mx-2 flex items-start space-x-4 rounded-md p-2 transition-all hover:bg-accent hover:text-accent-foreground">
