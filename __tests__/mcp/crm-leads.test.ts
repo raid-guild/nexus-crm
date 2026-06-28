@@ -218,6 +218,46 @@ describe("crm lead MCP tools", () => {
     expect(mockPrisma.crm_Leads.create).not.toHaveBeenCalled();
   });
 
+  it("updates an assigned lead probability score", async () => {
+    (mockPrisma.crm_Leads.findFirst as jest.Mock).mockResolvedValue({
+      id: "lead-1",
+      assigned_to: "user-1",
+    });
+    (mockPrisma.crm_Leads.update as jest.Mock).mockResolvedValue({
+      id: "lead-1",
+      probability_score: 80,
+    });
+
+    const result = await tool("crm_update_lead").handler(
+      { id: "lead-1", probability_score: 80 },
+      "user-1",
+    );
+
+    expect(mockPrisma.crm_Leads.update).toHaveBeenCalledWith({
+      where: { id: "lead-1" },
+      data: expect.objectContaining({
+        probability_score: 80,
+        updatedBy: "user-1",
+      }),
+    });
+    expect(result.data.probability_score).toBe(80);
+  });
+
+  it("rejects invalid lead probability scores in MCP schemas", () => {
+    expect(() =>
+      tool("crm_update_lead").schema.parse({
+        id: "00000000-0000-0000-0000-000000000001",
+        probability_score: 101,
+      }),
+    ).toThrow();
+    expect(() =>
+      tool("crm_create_lead").schema.parse({
+        lastName: "Lead",
+        probability_score: 0,
+      }),
+    ).not.toThrow();
+  });
+
   it("dry-runs lead import with duplicate detection", async () => {
     (mockPrisma.crm_Leads.findMany as jest.Mock).mockResolvedValue([
       {
@@ -364,7 +404,7 @@ describe("crm lead MCP tools", () => {
     const result = await tool("crm_import_leads").handler(
       {
         leads: [
-          { lastName: "One", email: "one@example.com" },
+          { lastName: "One", email: "one@example.com", probability_score: 35 },
           { lastName: "Two", email: "two@example.com" },
         ],
         segment_id: "segment-1",
@@ -376,6 +416,11 @@ describe("crm lead MCP tools", () => {
     );
 
     expect(mockPrisma.crm_Leads.create).toHaveBeenCalledTimes(2);
+    expect(mockPrisma.crm_Leads.create).toHaveBeenNthCalledWith(1, {
+      data: expect.objectContaining({
+        probability_score: 35,
+      }),
+    });
     expect(mockPrisma.crm_LeadSegmentMembers.createMany).toHaveBeenCalledWith({
       data: [
         {

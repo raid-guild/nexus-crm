@@ -16,6 +16,7 @@ export const createLead = async (data: {
   email?: string;
   phone?: string;
   description?: string;
+  probability_score?: number | null;
   lead_source_id?: string;
   lead_status_id?: string;
   lead_type_id?: string;
@@ -37,6 +38,7 @@ export const createLead = async (data: {
     email,
     phone,
     description,
+    probability_score,
     lead_source_id,
     lead_status_id,
     lead_type_id,
@@ -46,6 +48,16 @@ export const createLead = async (data: {
     accountIDs,
     segment_ids,
   } = data;
+
+  if (
+    probability_score !== undefined &&
+    probability_score !== null &&
+    (!Number.isInteger(probability_score) ||
+      probability_score < 0 ||
+      probability_score > 100)
+  ) {
+    return { error: "Probability score must be between 0 and 100" };
+  }
 
   try {
     const currentUser = await prismadb.users.findUnique({
@@ -66,6 +78,7 @@ export const createLead = async (data: {
         email,
         phone,
         description,
+        probability_score: probability_score ?? undefined,
         lead_source_id: lead_source_id || undefined,
         lead_status_id: lead_status_id || undefined,
         lead_type_id: lead_type_id || undefined,

@@ -55,6 +55,7 @@ const leadFieldSchema = {
   phone: z.string().optional(),
   jobTitle: z.string().optional(),
   description: z.string().optional(),
+  probability_score: z.number().int().min(0).max(100).nullable().optional(),
   lead_source_id: z.string().uuid().optional(),
   lead_status_id: z.string().uuid().nullable().optional(),
   lead_type_id: z.string().uuid().optional(),
@@ -277,6 +278,7 @@ export const crmLeadTools = [
         phone?: string;
         jobTitle?: string;
         description?: string;
+        probability_score?: number | null;
         lead_source_id?: string;
         lead_status_id?: string | null;
         lead_type_id?: string;
@@ -322,6 +324,7 @@ export const crmLeadTools = [
         phone?: string;
         jobTitle?: string;
         description?: string;
+        probability_score?: number | null;
         lead_source_id?: string;
         lead_status_id?: string | null;
         lead_type_id?: string;
@@ -440,6 +443,7 @@ export const crmLeadTools = [
           phone?: string;
           jobTitle?: string;
           description?: string;
+          probability_score?: number | null;
           lead_source_id?: string;
           lead_status_id?: string | null;
           lead_type_id?: string;

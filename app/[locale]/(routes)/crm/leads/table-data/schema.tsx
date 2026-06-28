@@ -18,6 +18,7 @@ export const leadSchema = z.object({
   email: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
+  probability_score: z.number().int().min(0).max(100).optional().nullable(),
   lead_source_id: z.string().optional().nullable(),
   lead_status_id: z.string().optional().nullable(),
   lead_type_id: z.string().optional().nullable(),

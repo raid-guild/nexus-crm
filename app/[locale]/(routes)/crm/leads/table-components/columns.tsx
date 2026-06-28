@@ -150,6 +150,18 @@ export const createColumns = (
     enableHiding: false,
   },
   {
+    accessorKey: "probability_score",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Probability" />
+    ),
+    cell: ({ row }) => {
+      const score = row.original.probability_score;
+      return <div className="w-[110px]">{score == null ? "—" : `${score}%`}</div>;
+    },
+    enableSorting: true,
+    enableHiding: true,
+  },
+  {
     accessorKey: "lead_status_id",
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Status" />
