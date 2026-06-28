@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/select";
 import { addLeadsToSegment } from "@/actions/crm/leads/segments";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 type ConfigItem = { id: string; name: string };
 
@@ -67,7 +68,10 @@ export function LeadDataTable<TData, TValue>({
   leadTypes = [],
   leadSegments = [],
 }: DataTableProps<TData, TValue>) {
-  const columns = createColumns(leadSources, leadStatuses, leadTypes, leadSegments) as ColumnDef<TData, TValue>[];
+  const leadFormT = useTranslations("CrmLeadForm");
+  const columns = createColumns(leadSources, leadStatuses, leadTypes, leadSegments, {
+    probabilityScore: leadFormT("probabilityScore"),
+  }) as ColumnDef<TData, TValue>[];
   const visibleLeadSegments = React.useMemo(() => {
     const segments = new Map<string, string>();
 

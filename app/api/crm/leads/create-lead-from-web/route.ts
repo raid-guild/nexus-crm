@@ -1,6 +1,17 @@
 import { prismadb } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
+function parseProbabilityScore(value: unknown) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value === "number") return Number.isFinite(value) ? value : NaN;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed || !/^-?\d+(\.\d+)?$/.test(trimmed)) return NaN;
+    return Number(trimmed);
+  }
+  return NaN;
+}
+
 export async function POST(req: Request) {
   if (req.headers.get("content-type") !== "application/json") {
     return NextResponse.json(
@@ -29,12 +40,7 @@ export async function POST(req: Request) {
     lead_source,
     probability_score,
   } = body;
-  const probabilityScore =
-    probability_score === undefined ||
-    probability_score === null ||
-    probability_score === ""
-      ? undefined
-      : Number(probability_score);
+  const probabilityScore = parseProbabilityScore(probability_score);
 
   //Validate auth with token from .env.local
   const token = headers.get("authorization");
@@ -67,7 +73,7 @@ export async function POST(req: Request) {
         probabilityScore > 100)
     ) {
       return NextResponse.json(
-        { message: "Probability score must be between 0 and 100" },
+        { message: "Probability score must be a whole number between 0 and 100" },
         { status: 400 }
       );
     }

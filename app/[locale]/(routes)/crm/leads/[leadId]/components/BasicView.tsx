@@ -32,6 +32,7 @@ import { LeadDetailActions } from "./LeadDetailActions";
 import { getAllCrmData } from "@/actions/crm/get-crm-data";
 import { Badge } from "@/components/ui/badge";
 import { getLeadSegments } from "@/actions/crm/leads/segments";
+import { getTranslations } from "next-intl/server";
 
 interface OppsViewProps {
   data: any;
@@ -45,6 +46,7 @@ export async function BasicView({ data }: OppsViewProps) {
     });
   const crmData = await getAllCrmData();
   const leadSegments = await getLeadSegments();
+  const leadFormT = await getTranslations("CrmLeadForm");
   const { leadSources, leadStatuses, leadTypes } = crmData;
   if (!data) return <div>Opportunity not found</div>;
   return (
@@ -206,7 +208,7 @@ export async function BasicView({ data }: OppsViewProps) {
                 <Percent className="mt-px h-5 w-5" />
                 <div className="space-y-1">
                   <p className="text-sm font-medium leading-none">
-                    Probability
+                    {leadFormT("probabilityScore")}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {data.probability_score == null

@@ -242,7 +242,7 @@
     "phone": "Telefon",
     "probabilityScore": "Wahrscheinlichkeit",
     "probabilityScorePlaceholder": "0-100",
-    "probabilityScoreInvalid": "Die Wahrscheinlichkeit muss zwischen 0 und 100 liegen",
+    "probabilityScoreInvalid": "Die Wahrscheinlichkeit muss eine ganze Zahl zwischen 0 und 100 sein",
     "leadSource": "Lead-Quelle",
     "leadSourcePlaceholder": "Lead-Quelle auswählen",
     "referredBy": "Empfohlen von",

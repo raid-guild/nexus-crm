@@ -244,7 +244,7 @@
     "phone": "Phone",
     "probabilityScore": "Probability score",
     "probabilityScorePlaceholder": "0-100",
-    "probabilityScoreInvalid": "Probability score must be between 0 and 100",
+    "probabilityScoreInvalid": "Probability score must be a whole number between 0 and 100",
     "leadSource": "Lead source",
     "leadSourcePlaceholder": "Select lead source",
     "referredBy": "Referred by",

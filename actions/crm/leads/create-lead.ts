@@ -56,7 +56,7 @@ export const createLead = async (data: {
       probability_score < 0 ||
       probability_score > 100)
   ) {
-    return { error: "Probability score must be between 0 and 100" };
+    return { error: "Probability score must be a whole number between 0 and 100" };
   }
 
   try {

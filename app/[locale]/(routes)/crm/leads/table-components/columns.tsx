@@ -12,6 +12,9 @@ import { DataTableRowActions } from "./data-table-row-actions";
 import moment from "moment";
 
 type ConfigItem = { id: string; name: string };
+type LeadColumnLabels = {
+  probabilityScore: string;
+};
 
 const includesSelectedValue = (
   rowValue: unknown,
@@ -28,6 +31,7 @@ export const createColumns = (
   leadStatuses: ConfigItem[],
   leadTypes: ConfigItem[],
   leadSegments: ConfigItem[],
+  labels: LeadColumnLabels,
 ): ColumnDef<Lead>[] => [
   {
     id: "select",
@@ -152,7 +156,7 @@ export const createColumns = (
   {
     accessorKey: "probability_score",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Probability" />
+      <DataTableColumnHeader column={column} title={labels.probabilityScore} />
     ),
     cell: ({ row }) => {
       const score = row.original.probability_score;
