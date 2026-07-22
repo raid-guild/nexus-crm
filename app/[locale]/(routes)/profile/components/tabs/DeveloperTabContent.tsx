@@ -26,8 +26,8 @@ export async function DeveloperTabContent({ userId: _userId }: Props) {
           <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
             .claude/skills/
           </code>{" "}
-          directory. It documents all 127 MCP tools so Claude Code can interact
-          with your CRM data.
+          directory. It documents the available MCP tools and the restricted BD
+          Agent lead pilot workflow.
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <a
@@ -39,7 +39,12 @@ export async function DeveloperTabContent({ userId: _userId }: Props) {
             Download SKILL.md
           </a>
           <SkillMdCopyButton />
+          <SkillMdCopyButton mode="lead-pilot" />
         </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          The lead pilot configuration uses the same API token but exposes only
+          the approved lead tools.
+        </p>
       </div>
     </div>
   );
