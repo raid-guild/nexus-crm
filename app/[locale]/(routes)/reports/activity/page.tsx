@@ -1,14 +1,12 @@
 import { getTranslations } from "next-intl/server";
-import { Card, CardContent } from "@/components/ui/card";
 import { ReportPageLayout } from "@/components/reports/ReportPageLayout";
 import { ReportChart } from "@/components/reports/ReportChart";
 import { parseSearchParamsToFilters } from "@/actions/reports/types";
 import {
-  getTasksCreatedCompleted,
-  getOverdueTasks,
-  getTasksByAssignee,
   getActivitiesByType,
+  getRecentActivities,
 } from "@/actions/reports/activity";
+import { RecentActivities } from "@/components/reports/RecentActivities";
 
 type Props = { searchParams: Promise<Record<string, string | undefined>> };
 
@@ -22,18 +20,10 @@ export default async function ActivityReportPage({ searchParams }: Props) {
   const filters = parseSearchParamsToFilters(params);
   const t = await getTranslations("ReportsPage");
 
-  const [tasksData, overdue, tasksByAssignee, activitiesByType] = await Promise.all([
-    getTasksCreatedCompleted(filters),
-    getOverdueTasks(filters),
-    getTasksByAssignee(filters),
+  const [activitiesByType, recentActivities] = await Promise.all([
     getActivitiesByType(filters),
+    getRecentActivities(filters),
   ]);
-
-  const taskChartData = tasksData.map((d) => ({
-    name: d.name,
-    Created: d.created,
-    Completed: d.completed,
-  }));
 
   return (
     <ReportPageLayout
@@ -42,17 +32,7 @@ export default async function ActivityReportPage({ searchParams }: Props) {
       category="activity"
       currentFilters={params.toString()}
     >
-      <Card><CardContent className="p-4">
-        <p className="text-sm text-muted-foreground">{t("activity.overdueTasks")}</p>
-        <p className="text-2xl font-bold mt-1 text-red-500">{overdue}</p>
-      </CardContent></Card>
-      <ReportChart
-        data={taskChartData as never}
-        titleKey="tasksCreatedCompleted"
-        type="bar"
-        categories={["Created", "Completed"]}
-      />
-      <ReportChart data={tasksByAssignee} titleKey="tasksByAssignee" type="bar" />
+      <RecentActivities activities={recentActivities} />
       <ReportChart data={activitiesByType} titleKey="activitiesByType" type="bar" />
     </ReportPageLayout>
   );

@@ -59,7 +59,6 @@ export const reportTools = [
         dateTo: args.dateTo ? new Date(args.dateTo) : now,
       };
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let data: any;
       switch (args.category) {
         case "sales": {
@@ -79,7 +78,7 @@ export const reportTools = [
         }
         case "activity": {
           const mod = await import("@/actions/reports/activity");
-          data = await mod.getTasksByAssignee(filters);
+          data = await mod.getActivitiesByType(filters);
           break;
         }
         case "campaigns": {

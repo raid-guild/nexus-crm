@@ -39,6 +39,7 @@
     "projects": "Projects",
     "tasks": "Tasks",
     "myTasks": "My tasks",
+    "activities": "Activities",
     "documents": "Documents",
     "storage": "Storage",
     "invoices": "Invoices",
@@ -486,7 +487,7 @@
     "accountsTitle": "Accounts Reports",
     "accountsDescription": "Account growth and segmentation",
     "activityTitle": "Activity Reports",
-    "activityDescription": "Tasks and activities analytics",
+    "activityDescription": "CRM touchpoints and activity analytics",
     "campaignsTitle": "Campaigns Reports",
     "campaignsDescription": "Email campaign performance analytics",
     "usersTitle": "Users Reports",
@@ -513,8 +514,7 @@
     },
     "activity": {
       "title": "Activity Reports",
-      "description": "Tasks and activities analytics",
-      "overdueTasks": "Overdue Tasks"
+      "description": "CRM touchpoints and activity analytics"
     },
     "campaigns": {
       "title": "Campaigns Reports",
@@ -558,9 +558,6 @@
       "accountsByIndustry": "Accounts by Industry",
       "topAccountsByRevenue": "Top Accounts by Revenue",
       "accountsBySize": "Accounts by Size",
-      "overdueTasks": "Overdue Tasks",
-      "tasksCreatedCompleted": "Tasks Created vs Completed",
-      "tasksByAssignee": "Tasks by Assignee",
       "activitiesByType": "Activities by Type",
       "emailsSent": "Emails Sent",
       "openRate": "Open Rate",
