@@ -1,4 +1,4 @@
-import { crmLeadPilotTools, crmLeadTools } from "@/lib/mcp/tools/crm-leads";
+import { crmLeadAgentTools, crmLeadTools } from "@/lib/mcp/tools/crm-leads";
 import { prismadb } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
 import { inngest } from "@/inngest/client";
@@ -624,11 +624,11 @@ describe("crm lead MCP tools", () => {
   });
 });
 
-describe("BD Agent lead pilot tool surface", () => {
+describe("lead-only agent tool surface", () => {
   const uuid = "00000000-0000-4000-8000-000000000001";
 
   it("exposes exactly the nine approved lead tools", () => {
-    expect(crmLeadPilotTools.map((entry) => entry.name)).toEqual([
+    expect(crmLeadAgentTools.map((entry) => entry.name)).toEqual([
       "crm_list_lead_sources",
       "crm_list_lead_statuses",
       "crm_list_lead_types",
@@ -642,10 +642,10 @@ describe("BD Agent lead pilot tool surface", () => {
   });
 
   it("rejects ownership, status, and account changes through generic update", () => {
-    const updateTool = crmLeadPilotTools.find(
+    const updateTool = crmLeadAgentTools.find(
       (entry) => entry.name === "crm_update_lead",
     );
-    if (!updateTool) throw new Error("Pilot update tool not found");
+    if (!updateTool) throw new Error("Lead agent update tool not found");
 
     for (const field of [
       "assigned_to",
@@ -659,11 +659,11 @@ describe("BD Agent lead pilot tool surface", () => {
     }
   });
 
-  it("rejects ownership, status, and account fields during pilot creation", () => {
-    const createTool = crmLeadPilotTools.find(
+  it("rejects ownership, status, and account fields during lead-agent creation", () => {
+    const createTool = crmLeadAgentTools.find(
       (entry) => entry.name === "crm_create_lead",
     );
-    if (!createTool) throw new Error("Pilot create tool not found");
+    if (!createTool) throw new Error("Lead agent create tool not found");
 
     for (const field of [
       "assigned_to",
@@ -679,10 +679,10 @@ describe("BD Agent lead pilot tool surface", () => {
   });
 
   it("requires an exact status name instead of a database status ID", () => {
-    const statusTool = crmLeadPilotTools.find(
+    const statusTool = crmLeadAgentTools.find(
       (entry) => entry.name === "crm_update_lead_status",
     );
-    if (!statusTool) throw new Error("Pilot status tool not found");
+    if (!statusTool) throw new Error("Lead agent status tool not found");
 
     expect(statusTool.description).toBe(
       "Update a lead available to the authenticated user using an exact configured lead_status_name.",

@@ -1,13 +1,13 @@
 # BD Agent MCP Lead Pilot
 
-> **For implementers:** This is a deliberately small, trusted-team pilot. Its purpose is to prove that an agent operating as an existing NextCRM user can search, create, and update leads without disrupting the rest of the application. Do not turn the pilot into a general agent-identity, OAuth, or MCP-platform redesign.
+> **Historical initiative:** Development certification succeeded on 2026-07-23. Use the [NextCRM Agent Onboarding](../../public/AGENT_ONBOARDING.md) for ongoing setup and the permanent [`nextcrm-leads` skill](../../public/skills/nextcrm-leads/SKILL.md) for lead agents.
 
-**Status:** Proposed  
+**Status:** Completed
 **Initiative owner:** TBD  
 **Token owner/operator:** TBD  
 **Target agent:** BD Agent  
 **Initial environment:** Remote development  
-**Production access:** Small human-reviewed canary only
+**Outcome:** Lead-only MCP integration verified with synthetic data
 
 ## 1. Executive summary
 
@@ -28,9 +28,11 @@ The minimum pilot is:
 ## 2. Related artifacts
 
 - [MCP Authentication and Authorization Hardening Plan](./2026-07-21-mcp-authentication-authorization-hardening-plan.md) — post-pilot platform backlog; not a pilot gate
-- [Lead Lifecycle](./lead-lifecycle.md) — lead fields, statuses, and pilot tool contract
+- [NextCRM Agent Onboarding](../../public/AGENT_ONBOARDING.md) — canonical ongoing onboarding
+- [Lead Lifecycle](./lead-lifecycle.md) — lead fields, statuses, and lead-agent tool contract
 - [Bizdev CRM and Agent Operator Handoff](./bizdev-crm-agent-operator-handoff.md) — daily operating and approval rules
-- [Current public MCP skill](../../public/SKILL.md) — existing connection and tool guidance to update for the pilot
+- [General public MCP skill](../../public/SKILL.md) — full-catalog MCP guidance
+- [Lead-agent skill](../../public/skills/nextcrm-leads/SKILL.md) — permanent lead-only instructions
 
 ## 3. Current state
 
@@ -170,15 +172,15 @@ Implement this additively, without changing the tool list for existing MCP consu
 - [x] Document the nine approved tools and the excluded operations.
 - [x] Document search-before-create and no-automatic-retry behavior.
 - [x] Document approved update fields and dedicated status handling.
-- [x] Keep the existing token generation and add a lead-pilot MCP configuration on the Developer profile tab.
-- [x] Keep one public skill for the pilot; add a separate lead skill only if feedback shows that the broad skill causes tool-selection or context problems.
+- [x] Keep the existing token generation and add a lead-only MCP configuration on the Developer profile tab.
+- [x] Publish a focused `nextcrm-leads` skill package for the operator while retaining the broad skill for general MCP users.
 
 **Exit criterion:** A team member can configure the agent from the Developer page and complete the approved lead workflow without reading application source code.
 
 ### Workstream B: Add an isolated lead-only MCP surface
 
 - [x] Reuse the existing `nxtc__` bearer token validation.
-- [x] Register only the nine approved tools for the pilot configuration.
+- [x] Register only the nine approved tools for the lead-only configuration.
 - [x] Keep the existing full MCP route unchanged for current consumers.
 - [x] Reuse the application's role-aware lead scope so an admin/manager can access any non-deleted lead.
 - [x] Narrow the pilot create/update schemas so status, ownership, and account assignment cannot be changed through them.
@@ -205,7 +207,7 @@ Implement this additively, without changing the tool list for existing MCP consu
 - [x] Verify generic update cannot reassign ownership or bypass the status tool.
 - [x] Verify delete, import, conversion, and non-lead tools are unavailable through the pilot surface.
 - [x] Verify audit and `crm/lead.saved` effects.
-- [ ] Run the workflow in the remote development environment with synthetic leads before production.
+- [x] Run the workflow in the remote development environment with synthetic leads before production.
 
 **Exit criterion:** The approved workflow succeeds, the explicitly excluded behavior fails through the pilot surface, and no existing full-route regression is introduced.
 
@@ -213,7 +215,7 @@ Implement this additively, without changing the tool list for existing MCP consu
 
 1. The operator generates a named, expiring development token from the Developer profile tab.
 2. The operator stores it in the agent runtime's secret mechanism, never in prompts, skills, CRM fields, chat, or source control.
-3. The operator installs the updated NextCRM skill and configures the lead-only MCP surface.
+3. The operator installs the focused `nextcrm-leads` skill package and configures the lead-only MCP surface.
 4. The agent lists lead configuration and searches before every create.
 5. If a likely duplicate exists, the agent reports it rather than creating another record.
 6. The agent creates or updates only approved fields and verifies the returned record.

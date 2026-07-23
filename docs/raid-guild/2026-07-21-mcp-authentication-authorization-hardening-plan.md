@@ -1,25 +1,24 @@
 # MCP Authentication and Authorization Hardening Plan
 
-> **For agentic workers:** This is a post-pilot platform-hardening backlog. Do not begin it merely to launch the trusted-team BD Agent lead pilot. Start individual tasks only after explicit prioritization based on pilot evidence, a change in the trust model, or a decision to support external agents.
+> **For agentic workers:** This is a deferred platform-hardening backlog. Start individual tasks only after explicit prioritization based on operational evidence, a change in the trust model, or a decision to support external agents.
 
-**Status:** Proposed post-pilot backlog  
+**Status:** Proposed deferred backlog
 **Date:** 2026-07-21  
 **Priority:** Security / high  
 **Goal:** Ensure an MCP bearer token can perform only the operations explicitly granted to that token and permitted for its active application user, with the same record-level authorization rules as the web application.
 
-## Relationship to the BD Agent lead pilot
+## Relationship to current internal agent access
 
-The [BD Agent MCP Lead Pilot](./bd-agent-mcp-onboarding-initiative.md) intentionally does not require this full plan. The pilot uses:
+The proven internal lead-agent integration does not require this full plan. Current onboarding uses:
 
 - An existing user-owned, named, expiring API token.
 - The token owner's existing application role and lead access.
 - A lead-only MCP tool surface plus a client-side allowlist.
-- Focused audit/event parity and human review.
-- A very small production canary.
+- Focused audit/event parity and normal operator review.
 
-That choice is appropriate only for the small, trusted team described by the pilot. The token owner accepts responsibility for the configured agent, and the existing token may remain capable of reaching the full MCP endpoint outside the pilot configuration.
+That choice is appropriate for the current small, trusted team. The token owner accepts responsibility for the configured agent, and the existing token may remain capable of reaching the full MCP endpoint outside the lead-only configuration.
 
-Do not use the pilot as a reason to modify the `Users` model, add `AgentPrincipal`, add OAuth, migrate all MCP tools to capabilities, or refactor every domain. Revisit this hardening plan when the team needs a real server-enforced per-token privilege boundary, independent agent attribution, third-party onboarding, or larger unattended production volume.
+Do not modify the `Users` model, add `AgentPrincipal`, add OAuth, migrate all MCP tools to capabilities, or refactor every domain without one of those concrete needs. Revisit this plan when the team needs a real server-enforced per-token privilege boundary, independent agent attribution, third-party onboarding, or larger unattended production volume.
 
 ## Why this work is needed
 

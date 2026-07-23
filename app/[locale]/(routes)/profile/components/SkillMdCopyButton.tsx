@@ -13,7 +13,7 @@ const MCP_CONFIG = `{
   }
 }`;
 
-const LEAD_PILOT_MCP_CONFIG = `{
+const LEAD_MCP_CONFIG = `{
   "mcpServers": {
     "nextcrm-leads": {
       "type": "http",
@@ -24,17 +24,15 @@ const LEAD_PILOT_MCP_CONFIG = `{
 }`;
 
 type Props = {
-  mode?: "full" | "lead-pilot";
+  mode?: "full" | "leads";
 };
 
 export function SkillMdCopyButton({ mode = "full" }: Props) {
   const [copied, setCopied] = useState(false);
-  const isLeadPilot = mode === "lead-pilot";
+  const isLeadOnly = mode === "leads";
 
   function handleCopy() {
-    navigator.clipboard.writeText(
-      isLeadPilot ? LEAD_PILOT_MCP_CONFIG : MCP_CONFIG,
-    );
+    navigator.clipboard.writeText(isLeadOnly ? LEAD_MCP_CONFIG : MCP_CONFIG);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -47,8 +45,8 @@ export function SkillMdCopyButton({ mode = "full" }: Props) {
       {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
       {copied
         ? "Copied!"
-        : isLeadPilot
-          ? "Copy Lead Pilot Config"
+        : isLeadOnly
+          ? "Copy Lead MCP Config"
           : "Copy MCP Config"}
     </button>
   );

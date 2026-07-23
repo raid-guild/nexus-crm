@@ -1,0 +1,4 @@
+interface:
+  display_name: "NextCRM Leads"
+  short_description: "Safely search, create, and update NextCRM leads"
+  default_prompt: "Use $nextcrm-leads to safely search, create, or update NextCRM leads."

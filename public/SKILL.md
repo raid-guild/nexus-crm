@@ -27,9 +27,11 @@ Single POST endpoint. Simpler, the current MCP spec default.
 }
 ```
 
-### BD Agent lead pilot
+### Lead-only agents
 
-The trusted-team BD Agent pilot uses the same user-owned API token with a lead-only MCP endpoint:
+Lead agents can use the same user-owned API token with a lead-only MCP endpoint:
+
+For lead-agent setup, prefer the focused skill package at `/skills/nextcrm-leads/` over this full-catalog skill. See `/AGENT_ONBOARDING.md` for the complete onboarding flow.
 
 ```json
 {
@@ -43,7 +45,7 @@ The trusted-team BD Agent pilot uses the same user-owned API token with a lead-o
 }
 ```
 
-This endpoint exposes only the nine approved pilot lead tools. The token still represents the user who generated it and may remain valid on the general NextCRM MCP endpoint, so the operator remains responsible for how the token is configured and used.
+This endpoint exposes only nine lead tools. The token still represents the user who generated it and may remain valid on the general NextCRM MCP endpoint, so the operator remains responsible for how the token is configured and used.
 
 ### Option B — SSE (legacy, for older clients)
 
@@ -96,7 +98,7 @@ All tools require a valid Bearer token. Tokens are generated from the Developer 
 
 ### Leads (15 tools)
 
-Approved for the BD Agent lead pilot:
+Available on the lead-only endpoint:
 
 - **crm_list_lead_sources** — List configured lead sources
 - **crm_list_lead_statuses** — List configured lead statuses in lifecycle order
@@ -108,7 +110,7 @@ Approved for the BD Agent lead pilot:
 - **crm_update_lead** — Update an existing CRM lead by ID
 - **crm_update_lead_status** — Update a lead status by exact status name
 
-Available on the general MCP endpoint but excluded from the BD Agent pilot:
+Available on the general MCP endpoint but excluded from the lead-only endpoint:
 
 - **crm_import_leads** — Bulk import leads with dry-run and duplicate checks
 - **crm_convert_lead_to_opportunity** — Convert a lead into an opportunity
@@ -241,17 +243,17 @@ Available on the general MCP endpoint but excluded from the BD Agent pilot:
 
 ## Common Workflows
 
-### BD Agent lead pilot
+### Lead-only agent workflow
 
 1. Call `crm_list_lead_sources`, `crm_list_lead_statuses`, and `crm_list_lead_types` when configuration values are needed.
 2. Call `crm_search_leads` before every create using the best available email, company, phone, or name.
 3. If a likely match exists, call `crm_get_lead` and update the existing record or report an ambiguous match.
-4. If no likely match exists, call `crm_create_lead`. `lastName` is required. The pilot create contract does not accept ownership, status, or account-assignment fields.
-5. Use `crm_update_lead` only for ordinary lead fields. It cannot change ownership, status, or account assignment on the pilot endpoint.
+4. If no likely match exists, call `crm_create_lead`. `lastName` is required. The lead-only create contract does not accept ownership, status, or account-assignment fields.
+5. Use `crm_update_lead` only for ordinary lead fields. It cannot change ownership, status, or account assignment on the lead-only endpoint.
 6. Use `crm_update_lead_status` with an exact configured status name for an unambiguous lifecycle change.
 7. Verify the returned record and report the create, update, skip, ambiguity, or error to the human operator.
 
-Pilot rules:
+Lead-agent rules:
 
 - Never use delete, import, conversion, segment mutation, campaigns, enrichment, or unrelated CRM tools.
 - Never automatically retry a create after a timeout or unknown result. Search again and ask for human review.
