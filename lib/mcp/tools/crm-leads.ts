@@ -812,7 +812,7 @@ export const crmLeadTools = [
   },
 ];
 
-const PILOT_LEAD_TOOL_NAMES = [
+const LEAD_AGENT_TOOL_NAMES = [
   "crm_list_lead_sources",
   "crm_list_lead_statuses",
   "crm_list_lead_types",
@@ -824,7 +824,7 @@ const PILOT_LEAD_TOOL_NAMES = [
   "crm_update_lead_status",
 ] as const;
 
-const pilotCreateLeadSchema = z
+const leadAgentCreateSchema = z
   .object({
     ...leadFieldSchema,
     lastName: z.string().min(1),
@@ -837,7 +837,7 @@ const pilotCreateLeadSchema = z
   })
   .strict();
 
-const pilotUpdateLeadSchema = z
+const leadAgentUpdateSchema = z
   .object({
     id: z.string().uuid(),
     ...leadFieldSchema,
@@ -850,30 +850,30 @@ const pilotUpdateLeadSchema = z
   })
   .strict();
 
-const pilotUpdateLeadStatusSchema = z
+const leadAgentUpdateStatusSchema = z
   .object({
     id: z.string().uuid(),
     lead_status_name: z.string().trim().min(1),
   })
   .strict();
 
-const pilotLeadToolNames = new Set<string>(PILOT_LEAD_TOOL_NAMES);
+const leadAgentToolNames = new Set<string>(LEAD_AGENT_TOOL_NAMES);
 
-export const crmLeadPilotTools = crmLeadTools
-  .filter((entry) => pilotLeadToolNames.has(entry.name))
+export const crmLeadAgentTools = crmLeadTools
+  .filter((entry) => leadAgentToolNames.has(entry.name))
   .map((entry) => {
     if (entry.name === "crm_create_lead") {
-      return { ...entry, schema: pilotCreateLeadSchema };
+      return { ...entry, schema: leadAgentCreateSchema };
     }
     if (entry.name === "crm_update_lead") {
-      return { ...entry, schema: pilotUpdateLeadSchema };
+      return { ...entry, schema: leadAgentUpdateSchema };
     }
     if (entry.name === "crm_update_lead_status") {
       return {
         ...entry,
         description:
           "Update a lead available to the authenticated user using an exact configured lead_status_name.",
-        schema: pilotUpdateLeadStatusSchema,
+        schema: leadAgentUpdateStatusSchema,
       };
     }
     return entry;

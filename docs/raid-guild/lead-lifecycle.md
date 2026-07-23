@@ -207,9 +207,9 @@ Set or update:
 
 ## MCP and Agent Operations
 
-### BD Agent pilot tool set
+### Lead-agent tool set
 
-The trusted-team BD Agent pilot uses only these MCP tools:
+The lead-only MCP endpoint exposes these tools:
 
 - `crm_list_lead_sources`
 - `crm_list_lead_statuses`
@@ -221,13 +221,13 @@ The trusted-team BD Agent pilot uses only these MCP tools:
 - `crm_update_lead`
 - `crm_update_lead_status`
 
-The pilot does not permit lead import, conversion, deletion, segment mutation, ownership reassignment, bulk operations, campaigns, enrichment, or unrelated CRM tools. Those capabilities may continue to exist for other application workflows but are not part of the BD Agent pilot.
+The lead-only endpoint does not permit lead import, conversion, deletion, segment mutation, ownership reassignment, bulk operations, campaigns, enrichment, or unrelated CRM tools. Those capabilities may continue to exist through other approved application workflows.
 
-### Pilot create and update contract
+### Lead-agent create and update contract
 
 Before creating a lead, the agent must search by the best available identifiers, including email, company, phone, and name. If a likely match exists, the agent should update or report the match rather than create a duplicate.
 
-An agent-created lead requires `lastName` and should include the best available source context. The pilot create/update contract may use:
+An agent-created lead requires `lastName` and should include the best available source context. The lead-only create/update contract may use:
 
 - `firstName`
 - `lastName`
@@ -242,15 +242,15 @@ An agent-created lead requires `lastName` and should include the best available 
 - `refered_by`
 - `campaign`
 
-The generic pilot update tool must not change `assigned_to` or `lead_status_id`. Ownership reassignment requires human action. Status changes use `crm_update_lead_status` so lifecycle behavior has one clear path.
+The generic lead-only update tool must not change `assigned_to` or `lead_status_id`. Ownership reassignment requires human action. Status changes use `crm_update_lead_status` so lifecycle behavior has one clear path.
 
-For a pilot status change, call `crm_update_lead_status` with the lead record `id` and `lead_status_name` set to an exact configured status name. The pilot status schema does not accept `lead_status_id` and does not support clearing a status with `null`. An ambiguous lifecycle change should be reported for human review; conversion to an opportunity is outside the pilot.
+For a lead-agent status change, call `crm_update_lead_status` with the lead record `id` and `lead_status_name` set to an exact configured status name. The lead-only status schema does not accept `lead_status_id` and does not support clearing a status with `null`. An ambiguous lifecycle change should be reported for human review; conversion to an opportunity requires a separate approved workflow.
 
 After every create or update, the agent retrieves or checks the returned lead and reports what changed. If a create request times out or returns an unknown outcome, the agent must search before doing anything else and must not automatically retry the create.
 
-### Post-pilot bulk/import guidance
+### Bulk/import guidance
 
-If lead import is approved after the pilot, prefer:
+If lead import is approved for another workflow, prefer:
 
 - `segment_id` for the audience/import cohort
 - `source` for resolving the lead source

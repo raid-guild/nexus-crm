@@ -1,10 +1,10 @@
 import { createMcpHandler } from "mcp-handler";
 import { getMcpUser } from "@/lib/mcp/auth";
-import { crmLeadPilotTools } from "@/lib/mcp/tools/crm-leads";
+import { crmLeadAgentTools } from "@/lib/mcp/tools/crm-leads";
 
 const handler = createMcpHandler(
   (server) => {
-    for (const tool of crmLeadPilotTools) {
+    for (const tool of crmLeadAgentTools) {
       server.tool(
         tool.name,
         tool.description,
