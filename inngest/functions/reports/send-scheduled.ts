@@ -20,7 +20,7 @@ export async function getReportData(category: string, filters: any, scope: Repor
     case "sales": return { data: await salesActions.getOppsByMonth(filters, scope), headers: ["Month", "Opportunities"] as [string, string] };
     case "leads": return { data: await leadsActions.getNewLeads(filters, scope), headers: ["Month", "Leads"] as [string, string] };
     case "accounts": return { data: await accountsActions.getNewAccounts(filters, scope), headers: ["Month", "Accounts"] as [string, string] };
-    case "activity": return { data: await activityActions.getTasksByAssignee(filters, scope), headers: ["Assignee", "Tasks"] as [string, string] };
+    case "activity": return { data: await activityActions.getActivitiesByType(filters, scope), headers: ["Activity Type", "Count"] as [string, string] };
     case "campaigns": {
       const perf = await campaignsActions.getCampaignPerformance(filters, scope);
       return { data: [{ name: "Sent", Number: perf.sent }, { name: "Opened", Number: perf.opened }, { name: "Clicked", Number: perf.clicked }], headers: ["Metric", "Count"] as [string, string] };

@@ -1,9 +1,9 @@
 import { Suspense } from "react";
 import { getSession } from "@/lib/auth-server";
 import {
+  Activity as ActivityIcon,
   CoinsIcon,
   Contact,
-  ListTodo,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -11,9 +11,9 @@ import Container from "./components/ui/Container";
 import LoadingBox from "./components/dasboard/loading-box";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-import { getUsersTasksCount } from "@/actions/dashboard/get-tasks-count";
 import { getLeadsCount } from "@/actions/dashboard/get-leads-count";
 import { getContactCount } from "@/actions/dashboard/get-contacts-count";
+import { getActivitiesCount } from "@/actions/dashboard/get-activities-count";
 import { getTranslations } from "next-intl/server";
 
 const DashboardPage = async () => {
@@ -21,14 +21,12 @@ const DashboardPage = async () => {
 
   if (!session) return null;
 
-  const userId = session.user.id;
-
   //Fetch translations from dictionary
   const dict = await getTranslations("DashboardPage");
-  const [contacts, leads, usersTasks] = await Promise.all([
+  const [contacts, leads, activities] = await Promise.all([
     getContactCount(),
     getLeadsCount(),
-    getUsersTasksCount(userId),
+    getActivitiesCount(),
   ]);
 
   return (
@@ -50,10 +48,10 @@ const DashboardPage = async () => {
           content={leads}
         />
         <DashboardCard
-          href={`/projects/tasks/${userId}`}
-          title={dict("myTasks")}
-          IconComponent={ListTodo}
-          content={usersTasks}
+          href="/reports/activity"
+          title={dict("activities")}
+          IconComponent={ActivityIcon}
+          content={activities}
         />
       </div>
     </Container>

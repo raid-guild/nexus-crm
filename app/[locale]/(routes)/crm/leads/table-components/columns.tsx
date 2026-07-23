@@ -4,7 +4,6 @@ import Link from "next/link";
 import { ColumnDef } from "@tanstack/react-table";
 
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 
 import { Lead } from "../table-data/schema";
 import { DataTableColumnHeader } from "./data-table-column-header";
@@ -12,9 +11,6 @@ import { DataTableRowActions } from "./data-table-row-actions";
 import moment from "moment";
 
 type ConfigItem = { id: string; name: string };
-type LeadColumnLabels = {
-  probabilityScore: string;
-};
 
 const includesSelectedValue = (
   rowValue: unknown,
@@ -30,73 +26,34 @@ export const createColumns = (
   leadSources: ConfigItem[],
   leadStatuses: ConfigItem[],
   leadTypes: ConfigItem[],
-  leadSegments: ConfigItem[],
-  labels: LeadColumnLabels,
+  leadSegments: ConfigItem[]
 ): ColumnDef<Lead>[] => [
   {
-    id: "select",
-    header: ({ table }) => (
-      <Checkbox
-        checked={
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && "indeterminate")
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label="Select all"
+    id: "actions",
+    cell: ({ row }) => (
+      <DataTableRowActions
+        row={row}
+        leadSources={leadSources}
+        leadStatuses={leadStatuses}
+        leadTypes={leadTypes}
+        leadSegments={leadSegments}
       />
     ),
-    cell: ({ row }) => (
-      <Checkbox
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
-        aria-label="Select row"
-      />
-    ),
-    enableSorting: false,
-    enableHiding: false,
   },
   {
-    accessorKey: "createdAt",
+    accessorKey: "firstName",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Expected close" />
-    ),
-    cell: ({ row }) => (
-      <div className="w-[80px]">
-        {moment(row.getValue("createdAt")).format("YY-MM-DD")}
-      </div>
-    ),
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
-    accessorKey: "updatedAt",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Last update" />
-    ),
-    cell: ({ row }) => (
-      <div className="w-[80px]">
-        {moment(row.getValue("updatedAt")).format("YY-MM-DD")}
-      </div>
-    ),
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
-    accessorKey: "assigned_to_user",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Assigned to" />
+      <DataTableColumnHeader column={column} title="Name" />
     ),
 
     cell: ({ row }) => (
-      <div className="w-[150px]">
-        {
-          //@ts-ignore
-          //TODO: fix this
-          row.getValue("assigned_to_user")?.name ?? "Unassigned"
-        }
-      </div>
+      <Link href={`/crm/leads/${row.original.id}`} data-testid="lead-row-name">
+        <div>
+          {[row.original.firstName, row.original.lastName].filter(Boolean).join(" ")}
+        </div>
+      </Link>
     ),
-    enableSorting: true,
+    enableSorting: false,
     enableHiding: true,
   },
   {
@@ -118,50 +75,20 @@ export const createColumns = (
     enableHiding: true,
   },
   {
-    accessorKey: "firstName",
+    accessorKey: "assigned_to_user",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Name" />
+      <DataTableColumnHeader column={column} title="Assigned to" />
     ),
 
     cell: ({ row }) => (
-      <Link href={`/crm/leads/${row.original.id}`} data-testid="lead-row-name">
-        <div>
-          {[row.original.firstName, row.original.lastName].filter(Boolean).join(" ")}
-        </div>
-      </Link>
+      <div className="w-[150px]">
+        {
+          //@ts-ignore
+          //TODO: fix this
+          row.getValue("assigned_to_user")?.name ?? "Unassigned"
+        }
+      </div>
     ),
-    enableSorting: false,
-    enableHiding: true,
-  },
-  {
-    accessorKey: "email",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="E-mail" />
-    ),
-
-    cell: ({ row }) => <div className="w-[150px]">{row.getValue("email")}</div>,
-    enableSorting: true,
-    enableHiding: true,
-  },
-  {
-    accessorKey: "phone",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Phone" />
-    ),
-
-    cell: ({ row }) => <div className="w-[150px]">{row.getValue("phone")}</div>,
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
-    accessorKey: "probability_score",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title={labels.probabilityScore} />
-    ),
-    cell: ({ row }) => {
-      const score = row.original.probability_score;
-      return <div className="w-[110px]">{score == null ? "—" : `${score}%`}</div>;
-    },
     enableSorting: true,
     enableHiding: true,
   },
@@ -191,26 +118,6 @@ export const createColumns = (
       <div className="w-[150px]">
         {row.original.lead_source?.name ? (
           <Badge variant="secondary">{row.original.lead_source.name}</Badge>
-        ) : (
-          "Unassigned"
-        )}
-      </div>
-    ),
-    enableSorting: false,
-    enableHiding: true,
-    filterFn: (row, id, value) => {
-      return includesSelectedValue(row.getValue(id), value);
-    },
-  },
-  {
-    accessorKey: "lead_type_id",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Type" />
-    ),
-    cell: ({ row }) => (
-      <div className="w-[140px]">
-        {row.original.lead_type?.name ? (
-          <Badge variant="outline">{row.original.lead_type.name}</Badge>
         ) : (
           "Unassigned"
         )}
@@ -261,15 +168,16 @@ export const createColumns = (
     },
   },
   {
-    id: "actions",
-    cell: ({ row }) => (
-      <DataTableRowActions
-        row={row}
-        leadSources={leadSources}
-        leadStatuses={leadStatuses}
-        leadTypes={leadTypes}
-        leadSegments={leadSegments}
-      />
+    accessorKey: "updatedAt",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Last updated" />
     ),
+    cell: ({ row }) => (
+      <div className="w-[80px]">
+        {moment(row.getValue("updatedAt")).format("YY-MM-DD")}
+      </div>
+    ),
+    enableSorting: false,
+    enableHiding: false,
   },
 ];

@@ -18,7 +18,6 @@ interface DataTableToolbarProps<TData> {
   table: Table<TData>;
   leadSources: FilterOption[];
   leadStatuses: FilterOption[];
-  leadTypes: FilterOption[];
   leadSegments: FilterOption[];
 }
 
@@ -26,7 +25,6 @@ export function DataTableToolbar<TData>({
   table,
   leadSources,
   leadStatuses,
-  leadTypes,
   leadSegments,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0;
@@ -54,13 +52,6 @@ export function DataTableToolbar<TData>({
             column={table.getColumn("lead_source_id")}
             title="Source"
             options={leadSources}
-          />
-        )}
-        {table.getColumn("lead_type_id") && leadTypes.length > 0 && (
-          <DataTableFacetedFilter
-            column={table.getColumn("lead_type_id")}
-            title="Type"
-            options={leadTypes}
           />
         )}
         {table.getColumn("segments") && leadSegments.length > 0 && (

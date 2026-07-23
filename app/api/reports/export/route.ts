@@ -43,8 +43,8 @@ async function getReportData(
       };
     case "activity":
       return {
-        data: await activityActions.getTasksByAssignee(filters, scope),
-        headers: ["Assignee", "Tasks"],
+        data: await activityActions.getActivitiesByType(filters, scope),
+        headers: ["Activity Type", "Count"],
       };
     case "campaigns": {
       const perf = await campaignsActions.getCampaignPerformance(

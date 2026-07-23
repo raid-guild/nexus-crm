@@ -35,7 +35,7 @@ jest.mock("@/actions/reports/accounts", () => ({
 }));
 
 jest.mock("@/actions/reports/activity", () => ({
-  getTasksByAssignee: jest.fn(),
+  getActivitiesByType: jest.fn(),
 }));
 
 jest.mock("@/actions/reports/campaigns", () => ({
