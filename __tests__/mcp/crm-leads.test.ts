@@ -1,5 +1,7 @@
-import { crmLeadTools } from "@/lib/mcp/tools/crm-leads";
+import { crmLeadPilotTools, crmLeadTools } from "@/lib/mcp/tools/crm-leads";
 import { prismadb } from "@/lib/prisma";
+import { writeAuditLog } from "@/lib/audit-log";
+import { inngest } from "@/inngest/client";
 
 jest.mock("@/lib/prisma", () => ({
   prismadb: {
@@ -39,6 +41,13 @@ jest.mock("@/lib/prisma", () => ({
     },
   },
 }));
+jest.mock("@/lib/audit-log", () => ({
+  diffObjects: jest.fn().mockReturnValue([]),
+  writeAuditLog: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock("@/inngest/client", () => ({
+  inngest: { send: jest.fn().mockResolvedValue({}) },
+}));
 
 const mockPrisma = prismadb as jest.Mocked<typeof prismadb>;
 
@@ -51,6 +60,25 @@ function tool(name: string): any {
 describe("crm lead MCP tools", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (mockPrisma.users.findUnique as jest.Mock).mockResolvedValue({
+      id: "user-1",
+      role: "user",
+    });
+  });
+
+  it("lists every non-deleted lead for an admin", async () => {
+    (mockPrisma.users.findUnique as jest.Mock).mockResolvedValue({
+      id: "admin-1",
+      role: "admin",
+    });
+    (mockPrisma.crm_Leads.findMany as jest.Mock).mockResolvedValue([]);
+    (mockPrisma.crm_Leads.count as jest.Mock).mockResolvedValue(0);
+
+    await tool("crm_list_leads").handler({ limit: 20, offset: 0 }, "admin-1");
+
+    expect(mockPrisma.crm_Leads.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { deletedAt: null } }),
+    );
   });
 
   it("lists lead statuses in board order", async () => {
@@ -76,7 +104,9 @@ describe("crm lead MCP tools", () => {
   });
 
   it("updates an assigned lead status by exact status name", async () => {
-    (mockPrisma.crm_Leads.findFirst as jest.Mock).mockResolvedValue({ id: "lead-1" });
+    (mockPrisma.crm_Leads.findFirst as jest.Mock).mockResolvedValue({
+      id: "lead-1",
+    });
     (mockPrisma.crm_Lead_Statuses.findFirst as jest.Mock).mockResolvedValue({
       id: "status-follow-up",
     });
@@ -92,7 +122,11 @@ describe("crm lead MCP tools", () => {
     );
 
     expect(mockPrisma.crm_Leads.findFirst).toHaveBeenCalledWith({
-      where: { id: "lead-1", assigned_to: "user-1", deletedAt: null },
+      where: expect.objectContaining({
+        id: "lead-1",
+        deletedAt: null,
+        OR: expect.any(Array),
+      }),
     });
     expect(mockPrisma.crm_Lead_Statuses.findFirst).toHaveBeenCalledWith({
       where: { name: { equals: "Follow Up", mode: "insensitive" } },
@@ -104,11 +138,25 @@ describe("crm lead MCP tools", () => {
         data: { lead_status_id: "status-follow-up", updatedBy: "user-1" },
       }),
     );
+    expect(writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entityType: "lead",
+        entityId: "lead-1",
+        action: "updated",
+        userId: "user-1",
+      }),
+    );
+    expect(inngest.send).toHaveBeenCalledWith({
+      name: "crm/lead.saved",
+      data: { record_id: "lead-1" },
+    });
     expect(result.data.lead_status.name).toBe("Follow Up");
   });
 
   it("clears an assigned lead status when lead_status_id is null", async () => {
-    (mockPrisma.crm_Leads.findFirst as jest.Mock).mockResolvedValue({ id: "lead-1" });
+    (mockPrisma.crm_Leads.findFirst as jest.Mock).mockResolvedValue({
+      id: "lead-1",
+    });
     (mockPrisma.crm_Leads.update as jest.Mock).mockResolvedValue({
       id: "lead-1",
       lead_status_id: null,
@@ -158,6 +206,17 @@ describe("crm lead MCP tools", () => {
         createdBy: "user-1",
         updatedBy: "user-1",
       }),
+    });
+    expect(writeAuditLog).toHaveBeenCalledWith({
+      entityType: "lead",
+      entityId: "lead-1",
+      action: "created",
+      changes: null,
+      userId: "user-1",
+    });
+    expect(inngest.send).toHaveBeenCalledWith({
+      name: "crm/lead.saved",
+      data: { record_id: "lead-1" },
     });
   });
 
@@ -239,6 +298,18 @@ describe("crm lead MCP tools", () => {
         probability_score: 80,
         updatedBy: "user-1",
       }),
+    });
+    expect(writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entityType: "lead",
+        entityId: "lead-1",
+        action: "updated",
+        userId: "user-1",
+      }),
+    );
+    expect(inngest.send).toHaveBeenCalledWith({
+      name: "crm/lead.saved",
+      data: { record_id: "lead-1" },
     });
     expect(result.data.probability_score).toBe(80);
   });
@@ -451,7 +522,9 @@ describe("crm lead MCP tools", () => {
       id: "source-scrape",
     });
     (mockPrisma.crm_Leads.findMany as jest.Mock).mockResolvedValue([]);
-    (mockPrisma.crm_Leads.create as jest.Mock).mockResolvedValue({ id: "lead-1" });
+    (mockPrisma.crm_Leads.create as jest.Mock).mockResolvedValue({
+      id: "lead-1",
+    });
 
     await tool("crm_import_leads").handler(
       {
@@ -477,7 +550,9 @@ describe("crm lead MCP tools", () => {
 
   it("assigns imported leads to the authenticated MCP user", async () => {
     (mockPrisma.crm_Leads.findMany as jest.Mock).mockResolvedValue([]);
-    (mockPrisma.crm_Leads.create as jest.Mock).mockResolvedValue({ id: "lead-1" });
+    (mockPrisma.crm_Leads.create as jest.Mock).mockResolvedValue({
+      id: "lead-1",
+    });
 
     await tool("crm_import_leads").handler(
       {
@@ -546,5 +621,80 @@ describe("crm lead MCP tools", () => {
     });
     expect(mockPrisma.crm_AuditLog.createMany).toHaveBeenCalled();
     expect(result.data.opportunity.id).toBe("opportunity-1");
+  });
+});
+
+describe("BD Agent lead pilot tool surface", () => {
+  const uuid = "00000000-0000-4000-8000-000000000001";
+
+  it("exposes exactly the nine approved lead tools", () => {
+    expect(crmLeadPilotTools.map((entry) => entry.name)).toEqual([
+      "crm_list_lead_sources",
+      "crm_list_lead_statuses",
+      "crm_list_lead_types",
+      "crm_list_leads",
+      "crm_get_lead",
+      "crm_search_leads",
+      "crm_create_lead",
+      "crm_update_lead",
+      "crm_update_lead_status",
+    ]);
+  });
+
+  it("rejects ownership, status, and account changes through generic update", () => {
+    const updateTool = crmLeadPilotTools.find(
+      (entry) => entry.name === "crm_update_lead",
+    );
+    if (!updateTool) throw new Error("Pilot update tool not found");
+
+    for (const field of [
+      "assigned_to",
+      "lead_status_id",
+      "account_id",
+      "accountIDs",
+    ]) {
+      expect(
+        updateTool.schema.safeParse({ id: uuid, [field]: uuid }).success,
+      ).toBe(false);
+    }
+  });
+
+  it("rejects ownership, status, and account fields during pilot creation", () => {
+    const createTool = crmLeadPilotTools.find(
+      (entry) => entry.name === "crm_create_lead",
+    );
+    if (!createTool) throw new Error("Pilot create tool not found");
+
+    for (const field of [
+      "assigned_to",
+      "lead_status_id",
+      "account_id",
+      "accountIDs",
+    ]) {
+      expect(
+        createTool.schema.safeParse({ lastName: "Lead", [field]: uuid })
+          .success,
+      ).toBe(false);
+    }
+  });
+
+  it("requires an exact status name instead of a database status ID", () => {
+    const statusTool = crmLeadPilotTools.find(
+      (entry) => entry.name === "crm_update_lead_status",
+    );
+    if (!statusTool) throw new Error("Pilot status tool not found");
+
+    expect(statusTool.description).toBe(
+      "Update a lead available to the authenticated user using an exact configured lead_status_name.",
+    );
+    expect(statusTool.description).not.toContain("lead_status_id");
+    expect(statusTool.description).not.toContain("null");
+    expect(
+      statusTool.schema.safeParse({ id: uuid, lead_status_id: uuid }).success,
+    ).toBe(false);
+    expect(
+      statusTool.schema.safeParse({ id: uuid, lead_status_name: "Follow Up" })
+        .success,
+    ).toBe(true);
   });
 });

@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { prismadb } from "@/lib/prisma";
+import { diffObjects, writeAuditLog } from "@/lib/audit-log";
+import { inngest } from "@/inngest/client";
+import { leadReadScopeWhere } from "@/lib/authz/scopes/crm";
+import { mapLegacyRole } from "@/lib/authz/roles";
 import {
   paginationSchema,
   paginationArgs,
@@ -32,7 +36,7 @@ function sortLeadStatuses<T extends { name: string }>(statuses: T[]): T[] {
     PREFERRED_LEAD_STATUS_ORDER.map((name, index) => [
       normalizeName(name),
       index,
-    ])
+    ]),
   );
 
   return [...statuses].sort((a, b) => {
@@ -67,7 +71,10 @@ const leadFieldSchema = {
 };
 
 async function listConfigValues(model: {
-  findMany: (args: { select: { id: true; name: true }; orderBy: { name: "asc" } }) => Promise<{ id: string; name: string }[]>;
+  findMany: (args: {
+    select: { id: true; name: true };
+    orderBy: { name: "asc" };
+  }) => Promise<{ id: string; name: string }[]>;
 }) {
   const values = await model.findMany({
     select: { id: true, name: true },
@@ -77,8 +84,12 @@ async function listConfigValues(model: {
 }
 
 function dedupeKeyForLead(
-  lead: { email?: string | null; company?: string | null; phone?: string | null },
-  keys: string[]
+  lead: {
+    email?: string | null;
+    company?: string | null;
+    phone?: string | null;
+  },
+  keys: string[],
 ) {
   return keys
     .map((key) => {
@@ -98,14 +109,21 @@ function exactInsensitive(field: "email" | "company" | "phone", value: string) {
 }
 
 function resolveAccountId(args: { account_id?: string; accountIDs?: string }) {
-  if (args.account_id && args.accountIDs && args.account_id !== args.accountIDs) {
+  if (
+    args.account_id &&
+    args.accountIDs &&
+    args.account_id !== args.accountIDs
+  ) {
     validationError("Provide either account_id or accountIDs, not both");
   }
 
   return args.account_id ?? args.accountIDs;
 }
 
-async function validateAssignedUser(assignedTo: string | undefined, userId: string) {
+async function validateAssignedUser(
+  assignedTo: string | undefined,
+  userId: string,
+) {
   if (!assignedTo || assignedTo === userId) return;
 
   const caller = await prismadb.users.findUnique({
@@ -121,6 +139,19 @@ async function validateAssignedUser(assignedTo: string | undefined, userId: stri
     select: { id: true },
   });
   if (!user) notFound("User");
+}
+
+async function getLeadReadScope(userId: string) {
+  const user = await prismadb.users.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true },
+  });
+  if (!user) notFound("User");
+
+  return leadReadScopeWhere({
+    id: user.id,
+    role: mapLegacyRole(user.role),
+  });
 }
 
 async function resolveLeadSourceIdByName(source?: string) {
@@ -169,7 +200,7 @@ export const crmLeadTools = [
   {
     name: "crm_list_leads",
     description:
-      "List CRM leads assigned to the authenticated user. Optionally filter by segment, source, status, or type.",
+      "List CRM leads available to the authenticated user. Optionally filter by segment, source, status, or type.",
     schema: z.object({
       ...paginationSchema,
       segment_id: z.string().uuid().optional(),
@@ -186,11 +217,10 @@ export const crmLeadTools = [
         lead_status_id?: string | null;
         lead_type_id?: string;
       },
-      userId: string
+      userId: string,
     ) {
       const where: any = {
-        assigned_to: userId,
-        deletedAt: null,
+        ...(await getLeadReadScope(userId)),
         ...(args.lead_source_id ? { lead_source_id: args.lead_source_id } : {}),
         ...(Object.prototype.hasOwnProperty.call(args, "lead_status_id")
           ? { lead_status_id: args.lead_status_id }
@@ -227,7 +257,7 @@ export const crmLeadTools = [
     schema: z.object({ id: z.string().uuid() }),
     async handler(args: { id: string }, userId: string) {
       const lead = await prismadb.crm_Leads.findFirst({
-        where: { id: args.id, assigned_to: userId, deletedAt: null },
+        where: { id: args.id, ...(await getLeadReadScope(userId)) },
       });
       if (!lead) notFound("Lead");
       return itemResponse(lead);
@@ -235,20 +265,25 @@ export const crmLeadTools = [
   },
   {
     name: "crm_search_leads",
-    description: "Search leads by name, company, or email (substring match)",
+    description:
+      "Search leads by name, company, email, or phone (substring match)",
     schema: z.object({ query: z.string().min(1), ...paginationSchema }),
     async handler(
       args: { query: string; limit: number; offset: number },
-      userId: string
+      userId: string,
     ) {
       const where = {
-        assigned_to: userId,
-        deletedAt: null,
-        OR: [
-          ilike("firstName", args.query),
-          ilike("lastName", args.query),
-          ilike("email", args.query),
-          ilike("company", args.query),
+        AND: [
+          await getLeadReadScope(userId),
+          {
+            OR: [
+              ilike("firstName", args.query),
+              ilike("lastName", args.query),
+              ilike("email", args.query),
+              ilike("company", args.query),
+              ilike("phone", args.query),
+            ],
+          },
         ],
       };
       const [data, total] = await Promise.all([
@@ -288,7 +323,7 @@ export const crmLeadTools = [
         account_id?: string;
         accountIDs?: string;
       },
-      userId: string
+      userId: string,
     ) {
       const { lastName, account_id, accountIDs, assigned_to, ...rest } = args;
       const assignedTo = assigned_to ?? userId;
@@ -303,6 +338,17 @@ export const crmLeadTools = [
           createdBy: userId,
           updatedBy: userId,
         },
+      });
+      await writeAuditLog({
+        entityType: "lead",
+        entityId: lead.id,
+        action: "created",
+        changes: null,
+        userId,
+      });
+      void inngest.send({
+        name: "crm/lead.saved",
+        data: { record_id: lead.id },
       });
       return itemResponse(lead);
     },
@@ -334,10 +380,10 @@ export const crmLeadTools = [
         account_id?: string;
         accountIDs?: string;
       },
-      userId: string
+      userId: string,
     ) {
       const existing = await prismadb.crm_Leads.findFirst({
-        where: { id: args.id, assigned_to: userId, deletedAt: null },
+        where: { id: args.id, ...(await getLeadReadScope(userId)) },
       });
       if (!existing) notFound("Lead");
       const { id, account_id, accountIDs, assigned_to, ...updateData } = args;
@@ -352,13 +398,27 @@ export const crmLeadTools = [
           updatedBy: userId,
         },
       });
+      await writeAuditLog({
+        entityType: "lead",
+        entityId: lead.id,
+        action: "updated",
+        changes: diffObjects(
+          existing as Record<string, unknown>,
+          lead as Record<string, unknown>,
+        ),
+        userId,
+      });
+      void inngest.send({
+        name: "crm/lead.saved",
+        data: { record_id: lead.id },
+      });
       return itemResponse(lead);
     },
   },
   {
     name: "crm_update_lead_status",
     description:
-      "Move one of the authenticated user's leads to a lead status by ID or exact status name. Pass lead_status_id null to clear the status.",
+      "Move a lead available to the authenticated user to a lead status by ID or exact status name. Pass lead_status_id null to clear the status.",
     schema: z.object({
       id: z.string().uuid(),
       lead_status_id: z.string().uuid().nullable().optional(),
@@ -370,23 +430,27 @@ export const crmLeadTools = [
         lead_status_id?: string | null;
         lead_status_name?: string;
       },
-      userId: string
+      userId: string,
     ) {
       const existing = await prismadb.crm_Leads.findFirst({
-        where: { id: args.id, assigned_to: userId, deletedAt: null },
+        where: { id: args.id, ...(await getLeadReadScope(userId)) },
       });
       if (!existing) notFound("Lead");
 
       const hasStatusId = Object.prototype.hasOwnProperty.call(
         args,
-        "lead_status_id"
+        "lead_status_id",
       );
       const hasStatusName = Boolean(args.lead_status_name?.trim());
       if (hasStatusId && hasStatusName) {
-        validationError("Provide either lead_status_id or lead_status_name, not both");
+        validationError(
+          "Provide either lead_status_id or lead_status_name, not both",
+        );
       }
       if (!hasStatusId && !hasStatusName) {
-        validationError("Provide lead_status_id, lead_status_name, or lead_status_id null");
+        validationError(
+          "Provide lead_status_id, lead_status_name, or lead_status_id null",
+        );
       }
 
       let nextStatusId: string | null = args.lead_status_id ?? null;
@@ -415,6 +479,21 @@ export const crmLeadTools = [
         },
       });
 
+      await writeAuditLog({
+        entityType: "lead",
+        entityId: lead.id,
+        action: "updated",
+        changes: diffObjects(
+          existing as Record<string, unknown>,
+          lead as Record<string, unknown>,
+        ),
+        userId,
+      });
+      void inngest.send({
+        name: "crm/lead.saved",
+        data: { record_id: lead.id },
+      });
+
       return itemResponse(lead);
     },
   },
@@ -423,15 +502,22 @@ export const crmLeadTools = [
     description:
       "Bulk import assigned leads with optional dry-run, dedupe checks, segment membership, and source/status/type fields.",
     schema: z.object({
-      leads: z.array(z.object({
-        ...leadFieldSchema,
-        lastName: z.string().min(1),
-      })).min(1).max(500),
+      leads: z
+        .array(
+          z.object({
+            ...leadFieldSchema,
+            lastName: z.string().min(1),
+          }),
+        )
+        .min(1)
+        .max(500),
       segment_id: z.string().uuid().optional(),
       import_batch_id: z.string().uuid().optional(),
       source: z.string().trim().min(1).optional(),
       dryRun: z.boolean().default(false),
-      dedupe_keys: z.array(z.enum(["email", "company", "phone"])).default(["email"]),
+      dedupe_keys: z
+        .array(z.enum(["email", "company", "phone"]))
+        .default(["email"]),
     }),
     async handler(
       args: {
@@ -459,7 +545,7 @@ export const crmLeadTools = [
         dryRun: boolean;
         dedupe_keys: Array<"email" | "company" | "phone">;
       },
-      userId: string
+      userId: string,
     ) {
       const importSourceId = await resolveLeadSourceIdByName(args.source);
       const leadsWithAssignees = await Promise.all(
@@ -470,7 +556,7 @@ export const crmLeadTools = [
             lead,
             assignedTo: lead.assigned_to ?? userId,
           };
-        })
+        }),
       );
 
       if (args.segment_id) {
@@ -496,7 +582,7 @@ export const crmLeadTools = [
           .map((lead) => exactInsensitive("phone", lead.phone as string)),
       ];
       const assignedToIds = Array.from(
-        new Set(leadsWithAssignees.map((item) => item.assignedTo))
+        new Set(leadsWithAssignees.map((item) => item.assignedTo)),
       );
 
       const existing: Array<{
@@ -529,20 +615,22 @@ export const crmLeadTools = [
               ? scopedDedupeKey(lead.assigned_to, key)
               : null;
           })
-          .filter((key): key is string => Boolean(key))
+          .filter((key): key is string => Boolean(key)),
       );
 
       const seenImportKeys = new Set<string>();
-      const candidates = leadsWithAssignees.map(({ lead, index, assignedTo }) => {
-        const key = dedupeKeyForLead(lead, args.dedupe_keys);
-        const scopedKey = key ? scopedDedupeKey(assignedTo, key) : "";
-        const duplicate = Boolean(
-          scopedKey &&
-            (existingKeys.has(scopedKey) || seenImportKeys.has(scopedKey))
-        );
-        if (scopedKey) seenImportKeys.add(scopedKey);
-        return { index, lead, key, assignedTo, duplicate };
-      });
+      const candidates = leadsWithAssignees.map(
+        ({ lead, index, assignedTo }) => {
+          const key = dedupeKeyForLead(lead, args.dedupe_keys);
+          const scopedKey = key ? scopedDedupeKey(assignedTo, key) : "";
+          const duplicate = Boolean(
+            scopedKey &&
+            (existingKeys.has(scopedKey) || seenImportKeys.has(scopedKey)),
+          );
+          if (scopedKey) seenImportKeys.add(scopedKey);
+          return { index, lead, key, assignedTo, duplicate };
+        },
+      );
 
       if (args.dryRun) {
         const duplicates = candidates
@@ -552,7 +640,8 @@ export const crmLeadTools = [
         return itemResponse({
           dryRun: true,
           requested: args.leads.length,
-          wouldCreate: candidates.filter((candidate) => !candidate.duplicate).length,
+          wouldCreate: candidates.filter((candidate) => !candidate.duplicate)
+            .length,
           duplicates,
         });
       }
@@ -560,8 +649,13 @@ export const crmLeadTools = [
       const created = [];
       for (const candidate of candidates) {
         if (candidate.duplicate) continue;
-        const { account_id, accountIDs, assigned_to, lead_source_id, ...leadData } =
-          candidate.lead;
+        const {
+          account_id,
+          accountIDs,
+          assigned_to,
+          lead_source_id,
+          ...leadData
+        } = candidate.lead;
         const lead = await prismadb.crm_Leads.create({
           data: {
             v: 0,
@@ -591,7 +685,8 @@ export const crmLeadTools = [
       return itemResponse({
         requested: args.leads.length,
         created: created.length,
-        duplicateCount: candidates.filter((candidate) => candidate.duplicate).length,
+        duplicateCount: candidates.filter((candidate) => candidate.duplicate)
+          .length,
         createdLeadIds: created.map((lead) => lead.id),
       });
     },
@@ -625,7 +720,7 @@ export const crmLeadTools = [
         sales_stage?: string;
         type?: string;
       },
-      userId: string
+      userId: string,
     ) {
       const lead = await prismadb.crm_Leads.findFirst({
         where: { id: args.id, assigned_to: userId, deletedAt: null },
@@ -636,7 +731,9 @@ export const crmLeadTools = [
       }
 
       const status = await prismadb.crm_Lead_Statuses.findFirst({
-        where: { name: { equals: "Converted to Opportunity", mode: "insensitive" } },
+        where: {
+          name: { equals: "Converted to Opportunity", mode: "insensitive" },
+        },
         select: { id: true },
       });
 
@@ -714,3 +811,70 @@ export const crmLeadTools = [
     },
   },
 ];
+
+const PILOT_LEAD_TOOL_NAMES = [
+  "crm_list_lead_sources",
+  "crm_list_lead_statuses",
+  "crm_list_lead_types",
+  "crm_list_leads",
+  "crm_get_lead",
+  "crm_search_leads",
+  "crm_create_lead",
+  "crm_update_lead",
+  "crm_update_lead_status",
+] as const;
+
+const pilotCreateLeadSchema = z
+  .object({
+    ...leadFieldSchema,
+    lastName: z.string().min(1),
+  })
+  .omit({
+    assigned_to: true,
+    lead_status_id: true,
+    account_id: true,
+    accountIDs: true,
+  })
+  .strict();
+
+const pilotUpdateLeadSchema = z
+  .object({
+    id: z.string().uuid(),
+    ...leadFieldSchema,
+  })
+  .omit({
+    assigned_to: true,
+    lead_status_id: true,
+    account_id: true,
+    accountIDs: true,
+  })
+  .strict();
+
+const pilotUpdateLeadStatusSchema = z
+  .object({
+    id: z.string().uuid(),
+    lead_status_name: z.string().trim().min(1),
+  })
+  .strict();
+
+const pilotLeadToolNames = new Set<string>(PILOT_LEAD_TOOL_NAMES);
+
+export const crmLeadPilotTools = crmLeadTools
+  .filter((entry) => pilotLeadToolNames.has(entry.name))
+  .map((entry) => {
+    if (entry.name === "crm_create_lead") {
+      return { ...entry, schema: pilotCreateLeadSchema };
+    }
+    if (entry.name === "crm_update_lead") {
+      return { ...entry, schema: pilotUpdateLeadSchema };
+    }
+    if (entry.name === "crm_update_lead_status") {
+      return {
+        ...entry,
+        description:
+          "Update a lead available to the authenticated user using an exact configured lead_status_name.",
+        schema: pilotUpdateLeadStatusSchema,
+      };
+    }
+    return entry;
+  });
