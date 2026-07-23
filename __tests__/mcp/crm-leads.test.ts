@@ -684,6 +684,11 @@ describe("BD Agent lead pilot tool surface", () => {
     );
     if (!statusTool) throw new Error("Pilot status tool not found");
 
+    expect(statusTool.description).toBe(
+      "Update a lead available to the authenticated user using an exact configured lead_status_name.",
+    );
+    expect(statusTool.description).not.toContain("lead_status_id");
+    expect(statusTool.description).not.toContain("null");
     expect(
       statusTool.schema.safeParse({ id: uuid, lead_status_id: uuid }).success,
     ).toBe(false);

@@ -108,7 +108,7 @@ Each handler must use the existing `lib/authz` helpers, such as `leadReadScopeWh
 | `lib/mcp/tools/*.ts`                                            | Apply capability, role, and existing resource authorization consistently      |
 | `actions/admin/users/deactivate-user.ts`                        | Revoke active tokens when a user is deactivated                               |
 | `public/SKILL.md`                                               | Document scoped bearer-token setup and safety behavior                        |
-| `docs/lead-lifecycle.md`                                        | Explain MCP authentication and lead authorization boundaries                  |
+| `docs/raid-guild/lead-lifecycle.md`                             | Explain MCP authentication and lead authorization boundaries                  |
 
 ---
 
@@ -175,6 +175,16 @@ Expected before implementation: the new authorization-regression tests fail for 
 - [ ] Return protocol-correct `401` responses for missing/invalid tokens and `403`/MCP `FORBIDDEN` errors for insufficient capabilities.
 - [ ] Remove the implicit development cookie fallback. If local cookie auth remains useful, require an explicit `MCP_ALLOW_DEV_SESSION_AUTH=true` setting and make startup visibly warn when it is enabled.
 - [ ] Do not store principal state in module globals; it must remain request-scoped.
+
+### Transport revocation contract
+
+Revocation takes effect on the next authenticated HTTP request; the server does not promise to cancel work that was already authenticated or proactively close an already-open stream.
+
+- **Streamable HTTP:** Revalidate the token on every request. A request already executing when revocation commits may finish, but every later POST must return `401` and must not invoke a tool handler.
+- **SSE:** Revalidate both the initial SSE GET and every message POST. Revocation does not forcibly close an established SSE response; it may remain idle until normal disconnect or timeout. Every later message POST must return `401`, invoke no tool handler, and a reconnect using the revoked token must also return `401`.
+- Do not treat an open transport session as cached authorization. Session identifiers cannot bypass token validation on subsequent requests.
+
+**Concurrent-revocation tests:** For Streamable HTTP, hold one authenticated request in flight, revoke the token, assert the in-flight request follows the documented may-finish behavior, and assert the next POST is rejected before tool dispatch. For SSE, establish the stream, revoke the token, assert the stream is not required to close, assert the next message POST is rejected before tool dispatch, and assert reconnection is rejected.
 
 ## Task 4: Make authorization metadata mandatory for every tool
 
@@ -266,14 +276,21 @@ Recommended initial limits should be validated against production traffic before
 - Modify `prisma/schema.prisma`
 - Add migration changes
 - Create `lib/mcp/audit.ts`
+- Modify `lib/audit-log.ts`
 - Modify the central tool wrapper
 
 - [ ] Record request ID, timestamp, token ID, user ID, tool name, risk class, outcome, duration, and safe resource identifiers.
 - [ ] Record denial reasons as categories such as `invalid_token`, `inactive_user`, `missing_scope`, `role_denied`, `resource_denied`, and `rate_limited`.
 - [ ] Never store bearer tokens, provider API keys, email bodies, document contents, or full arbitrary tool arguments.
 - [ ] Record both successful and denied high-impact operations.
+- [ ] Treat auditability for high-impact mutations as fail-closed. Database mutations and their audit record must commit in the same Prisma transaction; `lib/audit-log.ts` must accept the transaction client and rethrow persistence failures for this mode so the mutation rolls back.
+- [ ] For irreversible external side effects, commit a durable audit/outbox intent before provider dispatch. If the audit/outbox commit fails, do not call the provider. Retry pending delivery from the outbox and alert when retries are exhausted or an entry exceeds its delivery deadline.
+- [ ] Allow best-effort audit writes only for reads and other explicitly low-risk events. A swallowed `lib/audit-log.ts` error is not sufficient evidence that a high-impact operation was audited.
+- [ ] Have the central tool wrapper declare and enforce each tool's audit mode rather than relying on individual handlers to remember it.
 - [ ] Define retention and admin-only access for MCP audit records.
 - [ ] Add structured server logs suitable for alerting on repeated denials, campaign sends, bulk enrichment, and deletion spikes.
+
+**Tests:** Force the audit insert to fail during a high-impact database mutation and assert the mutation rolls back and the MCP call fails. Force the audit/outbox commit to fail for an external side effect and assert the provider is not called. Force outbox delivery to fail and assert the durable entry remains pending, retries occur, and an alert is emitted at the configured threshold.
 
 ## Task 8: Revoke credentials when user authority changes
 
@@ -294,7 +311,7 @@ Recommended initial limits should be validated against production traffic before
 **Files:**
 
 - Modify `public/SKILL.md`
-- Modify `docs/lead-lifecycle.md`
+- Modify `docs/raid-guild/lead-lifecycle.md`
 - Create `docs/mcp-security-operations.md`
 
 - [ ] Explain that the bearer token authenticates a user delegation, not an independent AI-agent identity.

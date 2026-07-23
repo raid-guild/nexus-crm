@@ -143,9 +143,9 @@ Implement this additively, without changing the tool list for existing MCP consu
 
 ### ADR-5: Lifecycle transition policy
 
-**Pilot decision:** Use the dedicated `crm_update_lead_status` tool and refer to statuses by exact name or stable semantic key.
+**Pilot decision:** Use the dedicated `crm_update_lead_status` tool with `lead_status_name` set to an exact configured status name.
 
-- Do not put database UUIDs in the skill or operating instructions.
+- The pilot status schema accepts only the lead record `id` and `lead_status_name`; it does not accept `lead_status_id` or support clearing a status with `null`.
 - Exclude `lead_status_id` and `assigned_to` from the generic pilot update contract.
 - Reject unknown or ambiguous status names.
 - Require human review for ambiguous lifecycle changes and conversion.

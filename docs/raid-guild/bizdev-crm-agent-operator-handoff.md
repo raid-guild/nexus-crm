@@ -289,6 +289,8 @@ Human approval is required for:
 - Moving a lead to opportunity if the context is ambiguous
 - Any message with pricing, commitments, legal terms, or sensitive claims
 
+During the BD Agent's initial production canary, the approval-free create and update permissions below do not apply to pilot lead mutations. The agent may touch only the pre-approved canary records, and a human must review every production lead create or update. Search, summarization, drafting, and suggested next actions remain approval-free. Broader lead-mutation autonomy requires an explicit post-canary decision.
+
 Agent can do without approval:
 
 - Search CRM

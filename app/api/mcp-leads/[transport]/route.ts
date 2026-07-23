@@ -29,9 +29,7 @@ const handler = createMcpHandler(
                     ? "INVALID_REQUEST"
                     : msg.startsWith("VALIDATION_ERROR:")
                       ? "INVALID_PARAMS"
-                      : msg.startsWith("EXTERNAL_ERROR:")
-                        ? "INTERNAL_ERROR"
-                        : "INTERNAL_ERROR";
+                      : "INTERNAL_ERROR";
             return {
               content: [
                 {

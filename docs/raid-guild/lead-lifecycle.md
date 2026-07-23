@@ -238,14 +238,13 @@ An agent-created lead requires `lastName` and should include the best available 
 - `description`
 - `probability_score`
 - `lead_source_id`
-- `lead_status_id`
 - `lead_type_id`
 - `refered_by`
 - `campaign`
 
 The generic pilot update tool must not change `assigned_to` or `lead_status_id`. Ownership reassignment requires human action. Status changes use `crm_update_lead_status` so lifecycle behavior has one clear path.
 
-Use exact status names or stable semantic keys in skills and agent instructions. Do not hard-code database UUIDs. An ambiguous lifecycle change should be reported for human review; conversion to an opportunity is outside the pilot.
+For a pilot status change, call `crm_update_lead_status` with the lead record `id` and `lead_status_name` set to an exact configured status name. The pilot status schema does not accept `lead_status_id` and does not support clearing a status with `null`. An ambiguous lifecycle change should be reported for human review; conversion to an opportunity is outside the pilot.
 
 After every create or update, the agent retrieves or checks the returned lead and reports what changed. If a create request times out or returns an unknown outcome, the agent must search before doing anything else and must not automatically retry the create.
 

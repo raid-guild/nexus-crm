@@ -869,7 +869,12 @@ export const crmLeadPilotTools = crmLeadTools
       return { ...entry, schema: pilotUpdateLeadSchema };
     }
     if (entry.name === "crm_update_lead_status") {
-      return { ...entry, schema: pilotUpdateLeadStatusSchema };
+      return {
+        ...entry,
+        description:
+          "Update a lead available to the authenticated user using an exact configured lead_status_name.",
+        schema: pilotUpdateLeadStatusSchema,
+      };
     }
     return entry;
   });
